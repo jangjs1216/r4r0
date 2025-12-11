@@ -1,0 +1,52 @@
+{
+  "$id": "contracts/frontend/dashboard.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DashboardViewProps",
+  "type": "object",
+  "required": ["user", "balances", "positions", "timestamp"],
+  "properties": {
+    "user": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "org": { "type": "string" }
+      }
+    },
+    "balances": {
+      "type": "object",
+      "required": ["totalEquity", "dayPnl", "weekPnl", "cash"],
+      "properties": {
+        "totalEquity": { "type": "number" },
+        "dayPnl": { "type": "number" },
+        "weekPnl": { "type": "number" },
+        "cash": { "type": "number" }
+      }
+    },
+    "positions": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/Position" }
+    },
+    "focusPosition": {
+      "oneOf": [
+        { "$ref": "#/definitions/Position" },
+        { "type": "null" }
+      ]
+    },
+    "timestamp": { "type": "string", "format": "date-time" }
+  },
+  "definitions": {
+    "Position": {
+      "type": "object",
+      "required": ["symbol", "size", "entry", "mark", "pnl"],
+      "properties": {
+        "symbol": { "type": "string" },
+        "size": { "type": "number" },
+        "entry": { "type": "number" },
+        "mark": { "type": "number" },
+        "pnl": { "type": "number" }
+      }
+    }
+  }
+}

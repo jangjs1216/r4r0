@@ -1,0 +1,110 @@
+{
+  "$id": "contracts/frontend/market.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MarketViewProps",
+  "type": "object",
+  "required": ["symbols", "selectedSymbol", "book"],
+  "properties": {
+    "symbols": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["symbol", "price", "change", "volume"],
+        "properties": {
+          "symbol": { "type": "string" },
+          "price": { "type": "number" },
+          "change": { "type": "number" },
+          "volume": { "type": "number" }
+        }
+      }
+    },
+    "selectedSymbol": { "type": "string" },
+    "book": {
+      "type": "object",
+      "required": ["bids", "asks", "tape"],
+      "properties": {
+        "bids": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [{ "type": "number" }, { "type": "number" }],
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "asks": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [{ "type": "number" }, { "type": "number" }],
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "tape": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["side", "px", "qty", "ago"],
+            "properties": {
+              "side": { "type": "string", "enum": ["buy", "sell"] },
+              "px": { "type": "number" },
+              "qty": { "type": "number" },
+              "ago": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "chart": {
+      "description": "Optional chart config; provider 'tradingview' will render via tv.js, else fallback uses local candles.",
+      "type": "object",
+      "required": ["provider", "symbol"],
+      "properties": {
+        "provider": { "type": "string", "enum": ["tradingview", "local"] },
+        "symbol": { "type": "string" },
+        "exchange": { "type": "string" },
+        "interval": { "type": "string" },
+        "candles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["ts", "o", "h", "l", "c"],
+            "properties": {
+              "ts": { "type": "number" },
+              "o": { "type": "number" },
+              "h": { "type": "number" },
+              "l": { "type": "number" },
+              "c": { "type": "number" }
+            }
+          }
+        },
+        "botMarkers": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/BotMarker" }
+        }
+      }
+    },
+    "botMarkers": {
+      "description": "Standalone markers to overlay on chart; optional (duplicates chart.botMarkers).",
+      "type": "array",
+      "items": { "$ref": "#/definitions/BotMarker" }
+    },
+    "onSymbolChange": {
+      "description": "Handler provided by the orchestrator; dispatches selected symbol changes"
+    }
+  },
+  "definitions": {
+    "BotMarker": {
+      "type": "object",
+      "required": ["id", "bot", "side", "price", "timestamp"],
+      "properties": {
+        "id": { "type": "string" },
+        "bot": { "type": "string" },
+        "side": { "type": "string", "enum": ["buy", "sell"] },
+        "price": { "type": "number" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

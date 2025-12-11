@@ -1,0 +1,47 @@
+{
+  "$id": "contracts/frontend/portfolio.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PortfolioViewProps",
+  "type": "object",
+  "required": ["holdings", "allocations", "transfers", "selectedSymbol"],
+  "properties": {
+    "holdings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["symbol", "size", "entry", "mark", "pnl"],
+        "properties": {
+          "symbol": { "type": "string" },
+          "size": { "type": "number" },
+          "entry": { "type": "number" },
+          "mark": { "type": "number" },
+          "pnl": { "type": "number" }
+        }
+      }
+    },
+    "allocations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["symbol", "pct", "funding"],
+        "properties": {
+          "symbol": { "type": "string" },
+          "pct": { "type": "number" },
+          "funding": { "type": "number" }
+        }
+      }
+    },
+    "transfers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["label", "status"],
+        "properties": {
+          "label": { "type": "string" },
+          "status": { "type": "string" }
+        }
+      }
+    },
+    "selectedSymbol": { "type": "string" }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "$id": "contracts/frontend/summary.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SummaryViewProps",
+  "type": "object",
+  "required": ["services", "tradesSummary"],
+  "properties": {
+    "services": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "status", "latencyMs", "errorRate", "contracts", "desc"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "status": { "type": "string", "enum": ["healthy", "warning", "degraded"] },
+          "latencyMs": { "type": "number" },
+          "errorRate": { "type": "number" },
+          "contracts": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "desc": { "type": "string" }
+        }
+      }
+    },
+    "tradesSummary": {
+      "type": "object",
+      "required": ["wins", "losses", "totalPnl", "avgLatency"],
+      "properties": {
+        "wins": { "type": "number" },
+        "losses": { "type": "number" },
+        "totalPnl": { "type": "number" },
+        "avgLatency": { "type": "number" }
+      }
+    }
+  }
+}

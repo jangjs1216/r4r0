@@ -1,0 +1,29 @@
+{
+  "$id": "contracts/frontend/overview.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OverviewViewProps",
+  "type": "object",
+  "required": ["services", "trades"],
+  "properties": {
+    "services": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "status", "latencyMs", "errorRate", "contracts", "desc"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "status": { "type": "string", "enum": ["healthy", "warning", "degraded"] },
+          "latencyMs": { "type": "number" },
+          "errorRate": { "type": "number" },
+          "contracts": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "desc": { "type": "string" }
+        }
+      }
+    },
+    "trades": { "type": "array", "items": { "$ref": "bot-trades.schema.json#/properties/trades/items" } }
+  }
+}

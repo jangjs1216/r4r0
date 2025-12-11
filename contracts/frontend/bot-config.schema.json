@@ -1,0 +1,34 @@
+{
+  "$id": "contracts/frontend/bot-config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BotConfigViewProps",
+  "type": "object",
+  "required": ["bots"],
+  "properties": {
+    "bots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "strategy", "status", "allocation", "schedule", "risk", "latencyMs", "lastSignal", "venue"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "strategy": { "type": "string" },
+          "status": { "type": "string", "enum": ["running", "paused"] },
+          "allocation": { "type": "number", "minimum": 0, "maximum": 1 },
+          "schedule": { "type": "string" },
+          "risk": { "type": "string" },
+          "latencyMs": { "type": "number" },
+          "lastSignal": { "type": "string" },
+          "venue": { "type": "string" }
+        }
+      }
+    },
+    "onToggle": {
+      "description": "Handler provided by the orchestrator; toggles bot status"
+    },
+    "onVenueChange": {
+      "description": "Handler provided by the orchestrator; rebinds bot to a venue adapter"
+    }
+  }
+}

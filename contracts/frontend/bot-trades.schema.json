@@ -1,0 +1,39 @@
+{
+  "$id": "contracts/frontend/bot-trades.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BotTradesViewProps",
+  "type": "object",
+  "required": ["trades", "summary"],
+  "properties": {
+    "trades": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "bot", "symbol", "side", "size", "entryPx", "exitPx", "pnl", "result", "latencyMs", "timestamp"],
+        "properties": {
+          "id": { "type": "string" },
+          "bot": { "type": "string" },
+          "symbol": { "type": "string" },
+          "side": { "type": "string", "enum": ["long", "short"] },
+          "size": { "type": "number" },
+          "entryPx": { "type": "number" },
+          "exitPx": { "type": "number" },
+          "pnl": { "type": "number" },
+          "result": { "type": "string", "enum": ["win", "loss"] },
+          "latencyMs": { "type": "number" },
+          "timestamp": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["wins", "losses", "totalPnl", "avgLatency"],
+      "properties": {
+        "wins": { "type": "number" },
+        "losses": { "type": "number" },
+        "totalPnl": { "type": "number" },
+        "avgLatency": { "type": "number" }
+      }
+    }
+  }
+}

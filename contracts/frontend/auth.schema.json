@@ -1,0 +1,42 @@
+{
+  "$id": "contracts/frontend/auth.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AuthViewProps",
+  "type": "object",
+  "required": ["session", "user", "controls"],
+  "properties": {
+    "session": {
+      "type": "object",
+      "required": ["status", "mfa", "apiKeys", "environment"],
+      "properties": {
+        "status": { "type": "string", "enum": ["authenticated", "locked", "unauthenticated"] },
+        "mfa": { "type": "boolean" },
+        "apiKeys": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "environment": { "type": "string" }
+      }
+    },
+    "user": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "org": { "type": "string" }
+      }
+    },
+    "controls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["label", "action"],
+        "properties": {
+          "label": { "type": "string" },
+          "action": { "type": "string" }
+        }
+      }
+    }
+  }
+}
