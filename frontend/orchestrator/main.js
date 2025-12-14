@@ -2,9 +2,10 @@ import { mountSummary } from "../views/summary/view.js";
 import { mountBotTrades } from "../views/bot-trades/view.js";
 import { mountServiceDetail } from "../views/service-detail/view.js";
 import { mountMarket } from "../views/market/view.js";
+import { mountAuth } from "../views/auth/view.js";
 
 const state = {
-  selected: "summary",
+  selected: "auth",
   selectedSymbol: "BTCUSDT",
   services: [
     {
@@ -58,6 +59,24 @@ const state = {
       desc: "Sign-in/up, MFA, key rotation prompts.",
     },
   ],
+  authProps: {
+    session: {
+      status: "authenticated",
+      mfa: true,
+      apiKeys: ["staging: bapi_3ca2...d9bf"],
+      environment: "staging",
+    },
+    user: {
+      name: "Ops Admin",
+      role: "admin",
+      org: "r4r0",
+    },
+    controls: [
+      { label: "Rotate active key", action: "rotate" },
+      { label: "Lock session", action: "lock" },
+      { label: "Sign out", action: "signout" },
+    ],
+  },
   trades: [
     {
       id: "TX-4812",
@@ -336,6 +355,14 @@ function mountSelected(container) {
     return;
   }
 
+  if (state.selected === "auth") {
+    mountAuth(container, {
+      ...state.authProps,
+      onCreateKey: handleApiKeyCreate,
+    });
+    return;
+  }
+
   const service = state.services.find((s) => s.id === state.selected);
   if (service) {
     mountServiceDetail(container, {
@@ -369,6 +396,31 @@ function updateSelectedSymbol(symbol) {
   state.selectedSymbol = symbol;
   state.markets.chart = { ...state.markets.chart, symbol: `BINANCE:${symbol}` };
   render();
+}
+
+function handleApiKeyCreate(payload) {
+  const env = payload.environment || state.authProps.session.environment;
+  const masked = maskKey(payload.apiKey);
+  const nextKeys = [formatKey(masked, env), ...state.authProps.session.apiKeys].slice(0, 5);
+  state.authProps = {
+    ...state.authProps,
+    session: {
+      ...state.authProps.session,
+      apiKeys: nextKeys,
+      environment: env,
+    },
+  };
+  render();
+}
+
+function maskKey(key) {
+  const val = (key || "").trim();
+  if (val.length <= 8) return `${val.slice(0, 2)}***`;
+  return `${val.slice(0, 4)}...${val.slice(-4)}`;
+}
+
+function formatKey(masked, env) {
+  return `${env}: ${masked}`;
 }
 
 function summarizeTrades(trades) {
