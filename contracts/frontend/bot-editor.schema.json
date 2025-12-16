@@ -1,0 +1,96 @@
+{
+    "$id": "contracts/frontend/bot-editor.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "BotEditorViewProps",
+    "type": "object",
+    "required": [
+        "mode",
+        "strategies",
+        "symbols",
+        "onSave",
+        "onCancel"
+    ],
+    "properties": {
+        "mode": {
+            "type": "string",
+            "enum": [
+                "create",
+                "edit"
+            ]
+        },
+        "targetBot": {
+            "type": "object",
+            "required": [
+                "name",
+                "status",
+                "allocation"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "strategyId": {
+                    "type": "string"
+                },
+                "symbol": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "running",
+                        "paused"
+                    ]
+                },
+                "allocation": {
+                    "type": "number"
+                },
+                "parameters": {
+                    "type": "object"
+                }
+            }
+        },
+        "strategies": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "parameterSchema"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "parameterSchema": {
+                        "type": "object",
+                        "description": "JSON Schema definition for the strategy's specific parameters"
+                    }
+                }
+            }
+        },
+        "symbols": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "onSave": {
+            "description": "Handler to save the bot configuration"
+        },
+        "onCancel": {
+            "description": "Handler to cancel editing and return to list"
+        }
+    }
+}

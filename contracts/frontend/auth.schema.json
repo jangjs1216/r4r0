@@ -3,40 +3,120 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "AuthViewProps",
   "type": "object",
-  "required": ["session", "user", "controls"],
+  "required": [
+    "session",
+    "exchangeKeys"
+  ],
   "properties": {
     "session": {
       "type": "object",
-      "required": ["status", "mfa", "apiKeys", "environment"],
+      "required": [
+        "status",
+        "security"
+      ],
       "properties": {
-        "status": { "type": "string", "enum": ["authenticated", "locked", "unauthenticated"] },
-        "mfa": { "type": "boolean" },
-        "apiKeys": {
-          "type": "array",
-          "items": { "type": "string" }
+        "status": {
+          "type": "string",
+          "enum": [
+            "authenticated",
+            "locked",
+            "unauthenticated"
+          ]
         },
-        "environment": { "type": "string" }
+        "security": {
+          "type": "object",
+          "properties": {
+            "mfaEnabled": {
+              "type": "boolean"
+            },
+            "lastLogin": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
       }
     },
-    "user": {
-      "type": "object",
-      "required": ["name"],
-      "properties": {
-        "name": { "type": "string" },
-        "role": { "type": "string" },
-        "org": { "type": "string" }
+    "exchangeKeys": {
+      "type": "array",
+      "description": "List of registered exchange API keys",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "exchange",
+          "label",
+          "publicKeyMasked",
+          "status",
+          "permissions"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "exchange": {
+            "type": "string",
+            "enum": [
+              "binance",
+              "upbit",
+              "okx",
+              "bybit"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "publicKeyMasked": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "expired",
+              "invalid"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "read",
+                "trade",
+                "withdraw"
+              ]
+            }
+          }
+        }
       }
     },
-    "controls": {
+    "supportedExchanges": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["label", "action"],
         "properties": {
-          "label": { "type": "string" },
-          "action": { "type": "string" }
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "iconUrl": {
+            "type": "string"
+          }
         }
       }
+    },
+    "onAddKey": {
+      "description": "Handler to add a new exchange key"
+    },
+    "onDeleteKey": {
+      "description": "Handler to remove an exchange key"
     }
   }
 }
