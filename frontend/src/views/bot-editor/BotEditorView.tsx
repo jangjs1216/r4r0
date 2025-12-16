@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../shared/components/Card';
-import { Badge } from '../../shared/components/Badge';
 import { useOrchestratorStore } from '../../orchestrator/store';
-import { ArrowLeft, Save, Play, Square, Settings as SettingsIcon } from 'lucide-react';
+import { Save, ArrowLeft, Settings } from 'lucide-react';
 
 export default function BotEditorView() {
     const { setView, editingBotId, setEditingBotId } = useOrchestratorStore();
@@ -56,12 +55,12 @@ export default function BotEditorView() {
     useEffect(() => {
         if (currentStrategy) {
             const defaults: Record<string, any> = {};
-            Object.entries(currentStrategy.params).forEach(([key, conf]) => {
+            Object.entries(currentStrategy.params).forEach(([key, conf]: [string, any]) => {
                 defaults[key] = conf.default;
             });
             setParams(defaults);
         }
-    }, [selectedStrategyId]);
+    }, [selectedStrategyId, currentStrategy]);
 
     const handleBack = () => {
         setEditingBotId(null);
@@ -194,7 +193,7 @@ export default function BotEditorView() {
                         {/* Dynamic Strategy Params */}
                         <div className="space-y-4">
                             <h3 className="text-sm font-semibold flex items-center gap-2 text-primary">
-                                <SettingsIcon size={16} />
+                                <Settings size={16} />
                                 {currentStrategy?.name} Settings
                             </h3>
 

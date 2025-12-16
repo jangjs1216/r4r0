@@ -1,6 +1,6 @@
 import { Card, CardHeader, CardTitle, CardContent } from '../../shared/components/Card';
 import { Badge } from '../../shared/components/Badge';
-import { Play, Pause, Settings, Plus, Square } from 'lucide-react';
+import { Play, Settings, Plus, Square } from 'lucide-react';
 import { useOrchestratorStore } from '../../orchestrator/store';
 
 

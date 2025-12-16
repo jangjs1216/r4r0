@@ -9,7 +9,7 @@ import BotTradesView from './views/bot-trades/BotTradesView';
 import AuthView from './views/auth/AuthView';
 
 export default function App() {
-  const { currentView, isAuthenticated } = useOrchestratorStore();
+  const { currentView } = useOrchestratorStore();
 
   const renderView = () => {
     switch (currentView) {

@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  # --- Frontend (React + Nginx) ---
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - auth-service
+    networks:
+      - r4r0-net
+
+  # --- Backend Services ---
+  
+  # AuthService (Key Manager)
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/auth/Dockerfile
+    volumes:
+      - ./data:/app/data # Persist SQLite DB
+    environment:
+      - MASTER_KEY=${MASTER_KEY:-dev_master_key_do_not_use_in_prod}
+    networks:
+      - r4r0-net
+
+networks:
+  r4r0-net:
+    driver: bridge

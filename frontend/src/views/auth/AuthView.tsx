@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import { useOrchestratorStore } from '../../orchestrator/store';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../shared/components/Card';
 import { Badge } from '../../shared/components/Badge';
-import { Shield, Key, Trash2, Plus, CheckCircle, AlertCircle, LogOut } from 'lucide-react';
+import { Shield, Key, Trash2, Plus, CheckCircle, AlertCircle } from 'lucide-react';
 
-// Mock Data Types based on schema
+const API_BASE = 'http://localhost:8000';
+
 interface ExchangeKey {
     id: string;
     exchange: 'binance' | 'upbit' | 'okx' | 'bybit';
@@ -16,105 +16,67 @@ interface ExchangeKey {
 }
 
 export default function AuthView() {
-    const { isAuthenticated, setAuthenticated, setView } = useOrchestratorStore();
-
     // --- State ---
-    const [keys, setKeys] = useState<ExchangeKey[]>([
-        {
-            id: 'k1', exchange: 'binance', label: 'Main Trading',
-            publicKeyMasked: 'vmPU...9d2A', status: 'active',
-            permissions: ['read', 'trade'], createdAt: '2025-11-10T10:00:00Z'
-        },
-        {
-            id: 'k2', exchange: 'upbit', label: 'Backup Account',
-            publicKeyMasked: 'Wz9L...k8s2', status: 'expired',
-            permissions: ['read'], createdAt: '2025-01-15T09:30:00Z'
-        }
-    ]);
+    const [keys, setKeys] = useState<ExchangeKey[]>([]);
     const [isAdding, setIsAdding] = useState(false);
     const [newKeyForm, setNewKeyForm] = useState({ exchange: 'binance', label: '', pub: '', sec: '' });
 
+    // --- Effects ---
+    useEffect(() => {
+        fetch(`${API_BASE}/keys`)
+            .then(res => {
+                if (!res.ok) throw new Error("Failed to fetch keys");
+                return res.json();
+            })
+            .then(data => setKeys(data))
+            .catch(err => console.error("Error loading keys:", err));
+    }, []);
+
     // --- Handlers ---
-    const handleLogin = () => {
-        setAuthenticated(true);
-        // We stay on this view to let user manage keys, or redirect?
-        // Usually login -> dashboard. But if user clicks 'Auth' tab later, they see Key Mgr.
-        // For first login, let's redirect to dashboard.
-        setView('dashboard');
+    const handleAddKey = async () => {
+        if (!newKeyForm.label || !newKeyForm.pub || !newKeyForm.sec) return;
+
+        try {
+            const res = await fetch(`${API_BASE}/keys`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    exchange: newKeyForm.exchange,
+                    label: newKeyForm.label,
+                    publicKey: newKeyForm.pub,
+                    secretKey: newKeyForm.sec
+                })
+            });
+
+            if (res.ok) {
+                const newKey: ExchangeKey = await res.json();
+                setKeys([...keys, newKey]);
+                setIsAdding(false);
+                setNewKeyForm({ exchange: 'binance', label: '', pub: '', sec: '' });
+            } else {
+                console.error("Failed to add key");
+                alert("Failed to add key");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Error adding key");
+        }
     };
 
-    const handleAddKey = () => {
-        if (!newKeyForm.label || !newKeyForm.pub) return;
-        const newKey: ExchangeKey = {
-            id: Math.random().toString(36).substr(2, 9),
-            exchange: newKeyForm.exchange as any,
-            label: newKeyForm.label,
-            publicKeyMasked: newKeyForm.pub.substring(0, 4) + '...' + newKeyForm.pub.substring(newKeyForm.pub.length - 4),
-            status: 'active',
-            permissions: ['read', 'trade'],
-            createdAt: new Date().toISOString()
-        };
-        setKeys([...keys, newKey]);
-        setIsAdding(false);
-        setNewKeyForm({ exchange: 'binance', label: '', pub: '', sec: '' });
+    const handleDeleteKey = async (id: string) => {
+        if (!confirm("Are you sure you want to remove this connection?")) return;
+
+        try {
+            const res = await fetch(`${API_BASE}/keys/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                setKeys(keys.filter(k => k.id !== id));
+            } else {
+                alert("Failed to delete key");
+            }
+        } catch (e) {
+            console.error(e);
+        }
     };
-
-    const handleDeleteKey = (id: string) => {
-        setKeys(keys.filter(k => k.id !== id));
-    };
-
-    // --- Render: Login Screen ---
-    if (!isAuthenticated) {
-        return (
-            <div className="p-6 flex items-center justify-center h-full min-h-[calc(100vh-4rem)]">
-                <div className="w-full max-w-md space-y-8">
-                    <div className="text-center space-y-2">
-                        <div className="w-16 h-16 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mx-auto mb-4">
-                            <Shield size={32} />
-                        </div>
-                        <h2 className="text-3xl font-bold tracking-tight">Welcome Back</h2>
-                        <p className="text-muted-foreground">Sign in to access your trading bots</p>
-                    </div>
-
-                    <Card className="border-border/50 shadow-lg bg-card/50 backdrop-blur">
-                        <CardContent className="pt-6 space-y-4">
-                            <div className="space-y-2">
-                                <label className="text-xs font-semibold text-muted-foreground ml-1">EMAIL</label>
-                                <input
-                                    type="email"
-                                    className="w-full px-4 py-3 bg-secondary/30 rounded-lg border border-border/50 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                                    placeholder="trader@example.com"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-semibold text-muted-foreground ml-1">PASSWORD</label>
-                                <input
-                                    type="password"
-                                    className="w-full px-4 py-3 bg-secondary/30 rounded-lg border border-border/50 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                                    placeholder="••••••••"
-                                />
-                            </div>
-                            <button
-                                onClick={handleLogin}
-                                className="w-full py-3 bg-primary text-primary-foreground font-bold rounded-lg hover:bg-primary/90 transition-all shadow-[0_4px_12px_rgba(0,0,0,0.1)] active:scale-[0.98]"
-                            >
-                                Sign In
-                            </button>
-
-                            <div className="relative my-4">
-                                <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border/50"></span></div>
-                                <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">Or</span></div>
-                            </div>
-
-                            <div className="text-center text-xs text-muted-foreground">
-                                <p>Mock Mode: Auto-login enabled</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
-        );
-    }
 
     // --- Render: Key Management Hub ---
     return (
@@ -135,7 +97,6 @@ export default function AuthView() {
                         <Plus size={16} />
                         Add Connection
                     </button>
-                    {/* Sign Out removed as per requirement */}
                 </div>
             </div>
 
@@ -146,7 +107,7 @@ export default function AuthView() {
                         <CardTitle className="text-sm">New Connection</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Exchange</label>
                                 <select
@@ -178,6 +139,21 @@ export default function AuthView() {
                                     value={newKeyForm.pub}
                                     onChange={e => setNewKeyForm({ ...newKeyForm, pub: e.target.value })}
                                 />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="text-xs font-medium text-muted-foreground mb-1 block">Secret Key</label>
+                                <input
+                                    type="password"
+                                    autoComplete="new-password"
+                                    name="secret-key-field"
+                                    className="w-full p-2 rounded-md border border-border bg-background text-sm font-mono"
+                                    placeholder="Enter your Secret key"
+                                    value={newKeyForm.sec}
+                                    onChange={e => setNewKeyForm({ ...newKeyForm, sec: e.target.value })}
+                                />
+                                <p className="text-[10px] text-muted-foreground mt-1">
+                                    * Secret Key is encrypted immediately upon submission and never stored in plain text.
+                                </p>
                             </div>
                         </div>
                         <div className="flex justify-end gap-2">
@@ -232,6 +208,13 @@ export default function AuthView() {
                         </CardContent>
                     </Card>
                 ))}
+                {keys.length === 0 && !isAdding && (
+                    <div className="text-center p-12 border border-dashed border-border rounded-xl">
+                        <Key className="mx-auto text-muted-foreground mb-2" />
+                        <h3 className="text-lg font-medium">No Keys Found</h3>
+                        <p className="text-muted-foreground text-sm">Add a connection to start trading</p>
+                    </div>
+                )}
             </div>
 
             <div className="mt-auto bg-blue-500/5 border border-blue-500/20 rounded-lg p-4 flex gap-3 text-sm text-blue-400">

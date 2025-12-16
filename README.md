@@ -22,11 +22,9 @@
   - 계약: `ServiceSpec.md` & `store.ts`.
 - `TradeFlowOrchestrator`: 포트폴리오 스냅샷 → 전략 시그널 → 실행 → 알림을 순차/조건 제어
 
-### 3. Backend Domain Services (개념적)
-- **StrategyEngine**: 플러그인 방식의 전략 실행기. `BotEditor`에 전략 스키마(Schema)를 제공.
-- **TradeExecution**: 거래소 주문 집행 및 관리.
-- **MarketData**: 실시간 데이터 스트리밍.
-- **Persistence**: 봇 설정 및 이력 저장 (DB).
+### 3.- **Backend Domain Services**  
+  - `AuthService`: **(Key Vault)** API Key의 안전한 암호화 저장소. 코드나 Config 파일이 아닌 로컬 DB(`data/*.db`)에 암호화해 저장하며, 다른 서비스에 서명 기능을 제공하거나 제한적으로 키를 불출함.
+  - `PortfolioService`(잔고, 포지션, PnL), `StrategyEngineService`(플러그형 전략 계약), `TradeExecutionService`(주문 라우팅) + **ExchangeAdapterService**(Binance 등).
 
 ## Contracts & Docs
 
@@ -41,14 +39,17 @@
 4. User가 `Grid Strategy` 선택 -> **BotEditorView**가 격자 간격, 상/하단 가격 입력 폼을 동적으로 렌더링.
 5. User 저장 -> `onSave` 이벤트 발생 -> **Backend**로 설정 전송 -> **BotConfigView**로 복귀.
 
-## 시작하기
+## 🚀 Running the Project
 
-- **Frontend**:
-  ```bash
-  cd frontend
-  npm install
-  npm run dev
-  ```
+Detailed instructions for Local Development and Docker Deployment can be found in [docs/deployment.md](./docs/deployment.md).
+
+### Quick Start (Docker)
+```bash
+export MASTER_KEY="my_secret"
+docker-compose up --build
+```
+
+
 - **Directory Structure**:
   - `frontend/src/views/*`: 각 뷰 서비스 (소스 + ServiceSpec + MockData)
   - `frontend/src/orchestrator/*`: 오케스트레이터

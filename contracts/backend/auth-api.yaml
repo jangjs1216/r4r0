@@ -1,0 +1,79 @@
+openapi: 3.0.0
+info:
+  title: Auth / Key Manager Service API
+  version: 1.0.0
+paths:
+  /keys:
+    get:
+      summary: List all registered exchange keys (masked)
+      responses:
+        '200':
+          description: List of keys
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExchangeKeySummary'
+    post:
+      summary: Register a new exchange key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterKeyRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExchangeKeySummary'
+  /keys/{id}:
+    delete:
+      summary: Delete a key
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Deleted
+
+components:
+  schemas:
+    RegisterKeyRequest:
+      type: object
+      required: [exchange, label, publicKey, secretKey]
+      properties:
+        exchange:
+          type: string
+          enum: [binance, upbit, okx, bybit]
+        label:
+          type: string
+        publicKey:
+          type: string
+        secretKey:
+          type: string
+
+    ExchangeKeySummary:
+      type: object
+      properties:
+        id: 
+          type: string
+        exchange:
+          type: string
+        label:
+          type: string
+        publicKeyMasked:
+          type: string
+        status:
+          type: string
+          enum: [active, expired, error]
+        permissions:
+          type: array
+          items:
+            type: string
