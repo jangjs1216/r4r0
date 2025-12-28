@@ -30,8 +30,48 @@ export default function BotConfigView() {
         return () => clearInterval(interval);
     }, []);
 
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+    const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3000);
+    };
+
+    const toggleBotStatus = async (bot: BotConfig) => {
+        if (!bot.id) return;
+
+        const newStatus: BotConfig['status'] = bot.status === 'RUNNING' ? 'STOPPED' : 'RUNNING';
+        const updatedBot: BotConfig = { ...bot, status: newStatus };
+
+        try {
+            await BotService.updateBot(bot.id, updatedBot);
+            // Optimistic UI update or wait for re-fetch
+            setBots(prev => prev.map(b => b.id === bot.id ? updatedBot : b));
+
+            if (newStatus === 'RUNNING') {
+                showToast(`Bot "${bot.name}" is now running!`, 'success');
+            } else {
+                showToast(`Bot "${bot.name}" has been stopped.`, 'success'); // Or 'info'
+            }
+        } catch (error) {
+            console.error("Failed to toggle status:", error);
+            showToast("Failed to update bot status.", 'error');
+        }
+    };
+
     return (
-        <div className="p-6 h-[calc(100vh-4rem)] flex flex-col gap-6">
+        <div className="p-6 h-[calc(100vh-4rem)] flex flex-col gap-6 relative">
+            {/* Simple Toast Notification */}
+            {toast && (
+                <div className={`fixed top-6 right-6 px-6 py-4 rounded-lg shadow-xl border flex items-center gap-3 animate-in slide-in-from-right-10 fade-in duration-300 z-50 ${toast.type === 'success'
+                    ? 'bg-emerald-950/90 border-emerald-500/50 text-emerald-100'
+                    : 'bg-red-950/90 border-red-500/50 text-red-100'
+                    }`}>
+                    <div className={`w-2 h-2 rounded-full ${toast.type === 'success' ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                    <span className="font-medium">{toast.message}</span>
+                </div>
+            )}
+
             <div className="flex items-center justify-between">
                 <div>
                     <h2 className="text-2xl font-bold">Bot Configuration</h2>
@@ -74,6 +114,7 @@ export default function BotConfigView() {
 
                                 <div className="border-t border-border pt-4 flex items-center justify-between gap-3">
                                     <button
+                                        onClick={() => toggleBotStatus(bot)}
                                         className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-colors ${bot.status === 'RUNNING'
                                             ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
                                             : 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'

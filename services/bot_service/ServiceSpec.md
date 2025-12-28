@@ -78,3 +78,66 @@
 ## 5. 변경 이력 (Change Log)
 
 - 2025-12-28: 초기 정의 (Bot Pipeline Plan 기반)
+- 2025-12-28: 이중 원장(Double-Entry Ledger) 시스템을 위한 `LocalOrder`, `GlobalExecution` 모델 및 API 추가
+
+---
+
+## 6. 추가 모델: 원장 시스템 (Ledger System)
+
+### 6.1 개념 모델
+- **LocalOrder (로컬 주문)**: 봇이 매매를 결심한 '의도'와 '시점'을 기록.
+  - `id`: UUID (Primary Key)
+  - `bot_id`: UUID (Foreign Key)
+  - `symbol`: String
+  - `side`: Enum (BUY, SELL)
+  - `quantity`: Float
+  - `timestamp`: DateTime (정확한 의사결정 시각)
+  - `status`: Enum (PENDING, SENT, FILLED, FAILED)
+  - `reason`: String (매매 근거 - 시각화용)
+
+- **GlobalExecution (글로벌 체결)**: 거래소에서 실제로 체결된 결과.
+  - `id`: String (Exchange Trade ID, Primary Key)
+  - `local_order_id`: UUID (Foreign Key)
+  - `exchange_order_id`: String (Exchange Order ID)
+  - `position_id`: String (Optional)
+  - `symbol`: String
+  - `price`: Float
+  - `quantity`: Float
+  - `fee`: Float
+  - `timestamp`: DateTime (거래소 체결 시각)
+
+### 6.2 Ledger API
+
+**POST /orders** (로컬 주문 기록)
+```json
+{
+  "bot_id": "uuid...",
+  "symbol": "BTC/USDT",
+  "side": "BUY",
+  "quantity": 1.5,
+  "reason": "RSI < 30",
+  "timestamp": "2025-..."
+}
+```
+Response: `{"id": "local_order_uuid"}`
+
+**PUT /orders/{id}/status** (상태 업데이트)
+```json
+{
+  "status": "SENT" or "FAILED"
+}
+```
+
+**POST /executions** (체결 기록)
+```json
+{
+  "local_order_id": "local_order_uuid",
+  "exchange_trade_id": "12345",
+  "exchange_order_id": "987654",
+  "symbol": "BTC/USDT",
+  "price": 50000.0,
+  "quantity": 1.5,
+  "fee": 0.001,
+  "timestamp": "2025-..."
+}
+```

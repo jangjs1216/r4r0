@@ -27,6 +27,9 @@
   - `ExchangeAdapterService`: 거래소(Binance 등) API 통신 전담. `AuthService`에서 키를 받아 잔고 조회, 주문 실행 등을 수행하며 Rate Limit을 관리함.
   - `BotService`: 봇 인스턴스의 설정(Config), 상태(Status), 생명주기(Lifecycle)를 관리하는 CRUD 서비스.
   - `TradingStrategyViewService`: 사용 가능한 전략(Template) 목록과 각 전략의 파라미터 스키마(JSON Schema)를 제공하는 메타데이터 서비스.
+  - `BotService`: 봇 인스턴스의 설정(Config), 상태(Status), 생명주기(Lifecycle)를 관리하는 CRUD 서비스.
+  - `TradingStrategyViewService`: 사용 가능한 전략(Template) 목록과 각 전략의 파라미터 스키마(JSON Schema)를 제공하는 메타데이터 서비스.
+  - `ExecutionService`: **(New)** 'RUNNING' 상태인 봇을 감지하여 실제 매매 루프(Loop)를 실행하는 워커 서비스. `BotService`와 분리되어 독립적으로 동작하며, `ExchangeAdapter`를 통해 주문을 집행함.
   - `PortfolioService`(잔고, 포지션, PnL), `StrategyEngineService`(플러그형 전략 계약), `TradeExecutionService`(주문 라우팅).
 
 ## Contracts & Docs
@@ -41,7 +44,19 @@
 3. **BotEditorView**는 사용 가능한 전략(`Grid`, `RSI`, `Vwap` 등) 목록과 각 전략의 파라미터 스키마를 로드.
 4. User가 `Grid Strategy` 선택 -> **BotEditorView**가 격자 간격, 상/하단 가격 입력 폼을 동적으로 렌더링.
 5. User 저장 -> `onSave` 이벤트 발생 -> **Backend**로 설정 전송 -> **BotConfigView**로 복귀.
+5. User 저장 -> `onSave` 이벤트 발생 -> **Backend**로 설정 전송 -> **BotConfigView**로 복귀.
 
+## 데이터 흐름 예시 (Bot Execution Flow)
+
+1. **User**가 `BotConfigView`에서 `Start` 클릭.
+2. **BotService**가 해당 봇의 상태를 `RUNNING`으로 변경.
+3. **ExecutionService**가 폴링(Polling) 또는 이벤트를 통해 `RUNNING` 상태의 봇 감지.
+4. **ExecutionService**가 해당 봇을 위한 **Worker Process/Task** 생성.
+5. Worker는 설정된 주기(Loop Policy)마다:
+   - **ExchangeAdapterService**에 현재가(Ticker) 및 잔고(Balance) 요청.
+   - 전략 로직(`Strategy Logic`)을 수행하여 매수/매도 시그널 생성.
+   - 시그널 발생 시 **ExchangeAdapterService**에 주문(Order) 요청.
+   - 실행 결과 로그 저장.
 ## 🚀 Running the Project
 
 Detailed instructions for Local Development and Docker Deployment can be found in [docs/deployment.md](./docs/deployment.md).

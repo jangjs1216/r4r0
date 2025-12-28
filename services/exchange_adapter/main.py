@@ -137,13 +137,95 @@ async def get_balance(key_id: str):
         
         return AccountBalance(totalUsdtValue=total_usdt, assets=assets)
 
+        return AccountBalance(totalUsdtValue=total_usdt, assets=assets)
+
     except Exception as e:
-        print(f"Exchange Error: {exchange_id} {str(e)}")
+        import datetime
+        print(f"[ERROR] Time: {datetime.datetime.now()} | Exchange Error: {exchange_id} {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         # Cleanup async session
         if exchange:
             await exchange.close()
+
+class OrderRequest(BaseModel):
+    key_id: str
+    symbol: str
+    side: str # 'buy' or 'sell'
+    amount: float
+    order_type: str = 'market'
+    price: Optional[float] = None
+
+@app.get("/market/ticker")
+async def get_ticker(key_id: str, symbol: str):    # Require key_id to determine exchange context
+    # 1. Get Credentials (for exchange routing, mostly)
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(f"{AUTH_SERVICE_URL}/internal/keys/{key_id}/secret")
+            if resp.status_code != 200:
+                raise HTTPException(status_code=resp.status_code, detail="Failed to retrieve key")
+            creds = resp.json()
+        except Exception as e:
+             raise HTTPException(status_code=503, detail=str(e))
+
+    exchange_id = creds['exchange']
+    exchange = await get_exchange_client(exchange_id, creds['publicKey'], creds['secretKey'])
+    
+    try:
+        # Load markets to get limits
+        await exchange.load_markets()
+        ticker = await exchange.fetch_ticker(symbol)
+        
+        # Extract Limits
+        market = exchange.market(symbol)
+        min_notional = market.get('limits', {}).get('cost', {}).get('min')
+        min_amount = market.get('limits', {}).get('amount', {}).get('min')
+
+        return {
+            "symbol": symbol, 
+            "price": ticker['last'],
+            "limits": {
+                "min_notional": min_notional,
+                "min_amount": min_amount
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        await exchange.close()
+
+@app.post("/order")
+async def place_order(order: OrderRequest):
+    # 1. Get Credentials
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(f"{AUTH_SERVICE_URL}/internal/keys/{order.key_id}/secret")
+            if resp.status_code != 200:
+                raise HTTPException(status_code=resp.status_code, detail="Failed to retrieve key")
+            creds = resp.json()
+        except Exception as e:
+             raise HTTPException(status_code=503, detail=str(e))
+
+    exchange_id = creds['exchange']
+    exchange = await get_exchange_client(exchange_id, creds['publicKey'], creds['secretKey'])
+
+    try:
+        # 2. Place Order
+        print(f"[INFO] Placing {order.side} order for {order.symbol} amount={order.amount}")
+        # CCXT create_order signature: (symbol, type, side, amount, price=None, params={})
+        result = await exchange.create_order(
+            symbol=order.symbol,
+            type=order.order_type,
+            side=order.side,
+            amount=order.amount,
+            price=order.price
+        )
+        return {"status": "filled", "order_id": result['id'], "details": result}
+    except Exception as e:
+        print(f"[ERROR] Order Failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        await exchange.close()
 
 @app.get("/health")
 def health_check():

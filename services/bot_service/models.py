@@ -1,6 +1,6 @@
-from sqlalchemy import Column, String, Text, DateTime, create_engine
+from sqlalchemy import Column, String, Text, DateTime, create_engine, Float, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
 import uuid
 import json
@@ -32,6 +32,36 @@ class Bot(Base):
     def get_config(self):
         return json.loads(self.config_json) if self.config_json else {}
 
+class LocalOrder(Base):
+    __tablename__ = "local_orders"
+
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
+    bot_id = Column(String, ForeignKey("bots.id"), index=True)
+    symbol = Column(String)
+    side = Column(String)     # BUY, SELL
+    quantity = Column(Float)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    status = Column(String, default="PENDING") # PENDING, SENT, FILLED, FAILED
+    reason = Column(String, nullable=True) # Reason for the order (e.g. "RSI < 30")
+
+    executions = relationship("GlobalExecution", back_populates="local_order")
+
+class GlobalExecution(Base):
+    __tablename__ = "global_executions"
+
+    id = Column(String, primary_key=True) # Exchange Trade ID
+    local_order_id = Column(String, ForeignKey("local_orders.id"), index=True)
+    exchange_order_id = Column(String, index=True) # Exchange Order ID
+    position_id = Column(String, nullable=True, index=True) # Optional Position ID
+    symbol = Column(String)
+    price = Column(Float)
+    quantity = Column(Float)
+    fee = Column(Float, default=0.0)
+    timestamp = Column(DateTime) # Exchange Time
+
+    local_order = relationship("LocalOrder", back_populates="executions")
+
+
 # --- Pydantic Schemas ---
 
 class BotBase(BaseModel):
@@ -53,6 +83,33 @@ class BotResponse(BotBase):
 
     class Config:
         from_attributes = True
+
+# Ledger Schemas
+class LocalOrderCreate(BaseModel):
+    bot_id: str
+    symbol: str
+    side: str
+    quantity: float
+    reason: Optional[str] = None
+    timestamp: Optional[datetime] = None
+
+class LocalOrderResponse(BaseModel):
+    id: str
+    status: str
+
+class OrderStatusUpdate(BaseModel):
+    status: str
+
+class GlobalExecutionCreate(BaseModel):
+    local_order_id: str
+    exchange_trade_id: str
+    exchange_order_id: str
+    position_id: Optional[str] = None
+    symbol: str
+    price: float
+    quantity: float
+    fee: float = 0.0
+    timestamp: datetime
 
 # Helper to reconstruct Pydantic model from DB entity
 def bot_to_pydantic(bot: Bot) -> BotResponse:

@@ -64,6 +64,21 @@ services:
     networks:
       - r4r0-net
 
+  # ExecutionService (Worker Engine)
+  execution-service:
+    build:
+      context: ./services/execution_service
+      dockerfile: Dockerfile
+    container_name: r4r0-execution-service
+    environment:
+      - BOT_SERVICE_URL=http://bot-service:8000
+      - ADAPTER_SERVICE_URL=http://exchange-adapter:8001
+    depends_on:
+      - bot-service
+      - exchange-adapter
+    networks:
+      - r4r0-net
+
 networks:
   r4r0-net:
     driver: bridge

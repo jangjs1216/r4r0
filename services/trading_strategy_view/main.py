@@ -42,6 +42,21 @@ STRATEGIES = [
             },
             "required": ["period", "buy_threshold", "sell_threshold"]
         }
+    },
+    {
+        "id": "test_trading_v1",
+        "name": "Test Trading (Buy & Sell Loop)",
+        "description": "Educational Strategy: Buys specified allocation, holds for duration, then sells. Repeats.",
+        "version": "1.0.0",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "allocation_ratio": {"type": "number", "minimum": 0.1, "maximum": 1.0, "title": "Buy Allocation Ratio (0.1-1.0)"},
+                "hold_duration": {"type": "integer", "minimum": 10, "title": "Hold Duration (Seconds)", "default": 60},
+                "loop_count": {"type": "integer", "default": 5, "title": "Loop Count (0=Infinite)"}
+            },
+            "required": ["allocation_ratio", "hold_duration"]
+        }
     }
 ]
 
