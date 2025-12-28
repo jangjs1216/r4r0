@@ -1,228 +1,106 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../shared/components/Card';
+import { useState } from 'react';
+import { Card, CardContent } from '../../shared/components/Card';
 import { useOrchestratorStore } from '../../orchestrator/store';
-import { Save, ArrowLeft, Settings } from 'lucide-react';
+import { Save, ArrowLeft, Plus, Trash2, ArrowDown, Settings2, PlayCircle, StopCircle, ShieldAlert } from 'lucide-react';
+
+// Mock Pipeline Nodes
+const initialNodes = [
+    { id: '1', type: 'trigger', title: 'Entry Trigger', desc: 'RSI < 30 (Oversold)', icon: PlayCircle },
+    { id: '2', type: 'filter', title: 'Trend Filter', desc: 'Price > EMA(200)', icon: Settings2 },
+    { id: '3', type: 'risk', title: 'Risk Management', desc: 'Stop Loss 2%, TP 5%', icon: ShieldAlert },
+    { id: '4', type: 'action', title: 'Execution', desc: 'Market Buy Order', icon: StopCircle },
+];
 
 export default function BotEditorView() {
     const { setView, editingBotId, setEditingBotId } = useOrchestratorStore();
-
-    // Mock Data: Strategies
-    const strategies = [
-        {
-            id: 'grid',
-            name: 'Grid Trading',
-            description: 'Places orders at regular intervals within a price range',
-            params: {
-                upperPrice: { type: 'number', label: 'Upper Price', default: 50000 },
-                lowerPrice: { type: 'number', label: 'Lower Price', default: 40000 },
-                grids: { type: 'number', label: 'Grid Count', default: 10 }
-            }
-        },
-        {
-            id: 'rsi',
-            name: 'RSI Reversal',
-            description: 'Buys when RSI is oversold, Sells when overbought',
-            params: {
-                period: { type: 'number', label: 'RSI Period', default: 14 },
-                overbought: { type: 'number', label: 'Overbought Level', default: 70 },
-                oversold: { type: 'number', label: 'Oversold Level', default: 30 }
-            }
-        },
-        {
-            id: 'vwap',
-            name: 'VWAP Trend',
-            description: 'Follows Volume Weighted Average Price trend',
-            params: {
-                maType: { type: 'select', label: 'MA Type', options: ['SMA', 'EMA'], default: 'SMA' },
-                period: { type: 'number', label: 'Lookback', default: 20 }
-            }
-        }
-    ];
-
-    // State
-    const [mode] = useState<'create' | 'edit'>(editingBotId ? 'edit' : 'create');
-    const [selectedStrategyId, setSelectedStrategyId] = useState<string>('grid');
-    const [botName, setBotName] = useState(editingBotId ? 'My Grid Bot #1' : '');
-    const [selectedSymbol, setSelectedSymbol] = useState('BTC/USDT');
-    const [allocation, setAllocation] = useState(0.2);
-
-    // Dynamic Params State
-    const [params, setParams] = useState<Record<string, any>>({});
-
-    const currentStrategy = strategies.find(s => s.id === selectedStrategyId);
-
-    // Init params with defaults when strategy changes
-    useEffect(() => {
-        if (currentStrategy) {
-            const defaults: Record<string, any> = {};
-            Object.entries(currentStrategy.params).forEach(([key, conf]: [string, any]) => {
-                defaults[key] = conf.default;
-            });
-            setParams(defaults);
-        }
-    }, [selectedStrategyId, currentStrategy]);
+    const [nodes, setNodes] = useState(initialNodes);
 
     const handleBack = () => {
         setEditingBotId(null);
         setView('bot-config');
     };
 
-    const handleSave = () => {
-        console.log('Saving Bot:', {
-            id: editingBotId,
-            name: botName,
-            strategy: selectedStrategyId,
-            symbol: selectedSymbol,
-            allocation,
-            params
-        });
-        handleBack();
-    };
-
     return (
-        <div className="p-6 h-[calc(100vh-4rem)] flex flex-col gap-6 max-w-4xl mx-auto w-full">
+        <div className="p-6 h-[calc(100vh-4rem)] flex flex-col gap-6 max-w-3xl mx-auto w-full">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <button
-                        onClick={handleBack}
-                        className="p-2 hover:bg-secondary rounded-full transition-colors"
-                    >
+                    <button onClick={handleBack} className="p-2 hover:bg-secondary rounded-full transition-colors">
                         <ArrowLeft size={20} />
                     </button>
                     <div>
                         <h1 className="text-2xl font-bold flex items-center gap-2">
-                            {mode === 'create' ? 'Create New Bot' : 'Edit Bot Configuration'}
+                            Pipeline Editor <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">v1.0</span>
                         </h1>
-                        <p className="text-muted-foreground text-sm">
-                            {mode === 'create' ? 'Configure a new automated trading strategy' : `ID: ${editingBotId}`}
-                        </p>
+                        <p className="text-muted-foreground text-sm">Design your strategy logic flow</p>
                     </div>
                 </div>
-                <div className="flex gap-2">
-                    <button
-                        onClick={handleBack}
-                        className="px-4 py-2 text-sm font-medium hover:bg-secondary rounded-md transition-colors"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 flex items-center gap-2"
-                    >
-                        <Save size={16} />
-                        Save Configuration
-                    </button>
-                </div>
+                <button className="px-4 py-2 bg-primary text-primary-foreground rounded-md flex items-center gap-2 font-medium hover:bg-primary/90">
+                    <Save size={16} /> Save Pipeline
+                </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Left Column: Strategy Selection */}
-                <Card className="md:col-span-1 h-fit">
-                    <CardHeader>
-                        <CardTitle className="text-sm uppercase tracking-wider text-muted-foreground">Select Strategy</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {strategies.map(strategy => (
-                            <div
-                                key={strategy.id}
-                                onClick={() => setSelectedStrategyId(strategy.id)}
-                                className={`p-4 rounded-lg border cursor-pointer transition-all ${selectedStrategyId === strategy.id
-                                        ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
-                                        : 'border-border hover:bg-secondary/50'
-                                    }`}
-                            >
-                                <div className="font-semibold mb-1">{strategy.name}</div>
-                                <div className="text-xs text-muted-foreground line-clamp-2">{strategy.description}</div>
-                            </div>
-                        ))}
-                    </CardContent>
-                </Card>
+            {/* Pipeline Canvas */}
+            <div className="flex-1 overflow-y-auto pr-2 relative">
+                {/* Central Line */}
+                <div className="absolute left-[2rem] top-4 bottom-4 w-0.5 bg-border -z-10" />
 
-                {/* Right Column: Configuration Form */}
-                <Card className="md:col-span-2">
-                    <CardHeader>
-                        <CardTitle className="text-sm uppercase tracking-wider text-muted-foreground">Bot Parameters</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        {/* Basic Info */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <label className="text-xs font-medium text-muted-foreground">Bot Name</label>
-                                <input
-                                    type="text"
-                                    value={botName}
-                                    onChange={(e) => setBotName(e.target.value)}
-                                    placeholder="e.g. BTC Grid Alpha"
-                                    className="w-full bg-secondary/20 border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-medium text-muted-foreground">Symbol</label>
-                                <select
-                                    value={selectedSymbol}
-                                    onChange={(e) => setSelectedSymbol(e.target.value)}
-                                    className="w-full bg-secondary/20 border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary appearance-none"
-                                >
-                                    <option>BTC/USDT</option>
-                                    <option>ETH/USDT</option>
-                                    <option>SOL/USDT</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-xs font-medium text-muted-foreground flex justify-between">
-                                <span>Capital Allocation</span>
-                                <span>{(allocation * 100).toFixed(0)}%</span>
-                            </label>
-                            <input
-                                type="range"
-                                min="0" max="1" step="0.05"
-                                value={allocation}
-                                onChange={(e) => setAllocation(parseFloat(e.target.value))}
-                                className="w-full"
-                            />
-                            <div className="text-xs text-muted-foreground text-right">
-                                Est. Capital: ~${(allocation * 10000).toLocaleString()} (Mock)
-                            </div>
-                        </div>
-
-                        <div className="h-px bg-border/50 my-4" />
-
-                        {/* Dynamic Strategy Params */}
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-semibold flex items-center gap-2 text-primary">
-                                <Settings size={16} />
-                                {currentStrategy?.name} Settings
-                            </h3>
-
-                            {currentStrategy && Object.entries(currentStrategy.params).map(([key, conf]: [string, any]) => (
-                                <div key={key} className="space-y-2">
-                                    <label className="text-xs font-medium text-muted-foreground">{conf.label}</label>
-                                    {conf.type === 'select' ? (
-                                        <select
-                                            value={params[key] || conf.default}
-                                            onChange={(e) => setParams({ ...params, [key]: e.target.value })}
-                                            className="w-full bg-secondary/20 border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary appearance-none"
-                                        >
-                                            {conf.options.map((opt: string) => (
-                                                <option key={opt} value={opt}>{opt}</option>
-                                            ))}
-                                        </select>
-                                    ) : (
-                                        <input
-                                            type={conf.type}
-                                            value={params[key] || ''}
-                                            onChange={(e) => setParams({ ...params, [key]: e.target.type === 'number' ? parseFloat(e.target.value) : e.target.value })}
-                                            className="w-full bg-secondary/20 border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                                        />
-                                    )}
+                <div className="space-y-2">
+                    {nodes.map((node, idx) => (
+                        <div key={node.id} className="relative group">
+                            {/* Node Connector (Visual) */}
+                            {idx > 0 && (
+                                <div className="absolute left-[2rem] -top-3 -translate-x-1/2 text-border bg-background p-0.5">
+                                    <ArrowDown size={14} />
                                 </div>
-                            ))}
+                            )}
+
+                            <div className="flex items-start gap-4">
+                                {/* Icon/Node Marker */}
+                                <div className="w-16 h-16 flex-shrink-0 flex items-center justify-center bg-background border-2 border-primary/20 rounded-full z-10 hover:border-primary hover:shadow-[0_0_15px_rgba(var(--primary),0.3)] transition-all cursor-pointer">
+                                    <node.icon size={24} className="text-primary" />
+                                </div>
+
+                                {/* Content Card */}
+                                <Card className="flex-1 hover:border-primary/50 transition-colors group-hover:bg-secondary/5 cursor-pointer">
+                                    <CardContent className="p-4 flex justify-between items-center">
+                                        <div>
+                                            <div className="text-xs uppercase font-bold text-muted-foreground mb-0.5">{node.type}</div>
+                                            <div className="font-semibold text-lg">{node.title}</div>
+                                            <div className="text-sm text-muted-foreground">{node.desc}</div>
+                                        </div>
+                                        <div className="opacity-0 group-hover:opacity-100 flex gap-2 transition-opacity">
+                                            <button className="p-2 hover:bg-background rounded-md border border-transparent hover:border-border text-muted-foreground hover:text-foreground">
+                                                <Settings2 size={16} />
+                                            </button>
+                                            <button className="p-2 hover:bg-red-500/10 rounded-md border border-transparent hover:border-red-500/20 text-muted-foreground hover:text-red-500">
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+
+                            {/* Add Button (Inter-node) */}
+                            <div className="h-8 flex items-center justify-start pl-[1.15rem] my-1 opacity-10 hover:opacity-100 transition-opacity">
+                                <button className="w-7 h-7 rounded-full bg-secondary border border-border flex items-center justify-center hover:bg-primary hover:text-primary-foreground hover:scale-110 transition-all">
+                                    <Plus size={14} />
+                                </button>
+
+                            </div>
                         </div>
-                    </CardContent>
-                </Card>
+                    ))}
+
+                    {/* End Node */}
+                    <div className="flex items-center gap-4 opacity-50">
+                        <div className="w-16 h-16 flex items-center justify-center border-2 border-dashed border-muted rounded-full ml-0">
+                            <div className="w-3 h-3 bg-muted rounded-full" />
+                        </div>
+                        <div className="text-sm text-muted-foreground italic">
+                            End of Pipeline
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     );
