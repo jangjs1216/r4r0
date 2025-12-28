@@ -1,8 +1,9 @@
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../shared/components/Card';
 import { Badge } from '../../shared/components/Badge';
 import { Play, Settings, Plus, Square } from 'lucide-react';
 import { useOrchestratorStore } from '../../orchestrator/store';
-
+import { BotService, type BotConfig } from '../bot-editor/api'; // Ensure api.ts exports BotConfig and BotService
 
 export default function BotConfigView() {
     const { setView, setEditingBotId } = useOrchestratorStore();
@@ -17,10 +18,17 @@ export default function BotConfigView() {
         setView('bot-editor');
     };
 
-    const bots = [
-        { id: 'bot-1', name: 'Alpha Grid BTC', strategy: 'Grid Trading', status: 'running', pnl: '+12.5%', allocation: 0.5 },
-        { id: 'bot-2', name: 'Ether RSI Swing', strategy: 'RSI Reversal', status: 'paused', pnl: '-2.4%', allocation: 0.3 },
-    ];
+    const [bots, setBots] = useState<BotConfig[]>([]);
+
+    useEffect(() => {
+        BotService.getAllBots().then(setBots).catch(console.error);
+
+        // Optional: Poll every 5s
+        const interval = setInterval(() => {
+            BotService.getAllBots().then(setBots).catch(console.error);
+        }, 5000);
+        return () => clearInterval(interval);
+    }, []);
 
     return (
         <div className="p-6 h-[calc(100vh-4rem)] flex flex-col gap-6">
@@ -45,37 +53,37 @@ export default function BotConfigView() {
                             <CardTitle className="text-lg font-bold flex items-center gap-2">
                                 {bot.name}
                             </CardTitle>
-                            <Badge variant={bot.status === 'running' ? 'default' : 'secondary'} className="capitalize">
+                            <Badge variant={bot.status === 'RUNNING' ? 'default' : 'secondary'} className="capitalize">
                                 {bot.status}
                             </Badge>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-2 text-sm">
-                                    <div className="text-muted-foreground">Strategy</div>
-                                    <div className="font-medium text-right">{bot.strategy}</div>
+                                    <div className="text-muted-foreground">Mode</div>
+                                    <div className="font-medium text-right">{bot.global_settings?.mode || 'N/A'}</div>
 
                                     <div className="text-muted-foreground">Allocation</div>
-                                    <div className="font-medium text-right">{bot.allocation * 100}%</div>
+                                    <div className="font-medium text-right">{bot.global_settings?.account_allocation || 0} USDT</div>
 
-                                    <div className="text-muted-foreground">Total PnL</div>
-                                    <div className={`font-medium text-right ${bot.pnl.startsWith('+') ? 'text-emerald-500' : 'text-red-500'}`}>
-                                        {bot.pnl}
+                                    <div className="text-muted-foreground">Strategy</div>
+                                    <div className="font-medium text-right truncate">
+                                        {bot.pipeline?.strategy?.id || 'None'}
                                     </div>
                                 </div>
 
                                 <div className="border-t border-border pt-4 flex items-center justify-between gap-3">
                                     <button
-                                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-colors ${bot.status === 'running'
+                                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-colors ${bot.status === 'RUNNING'
                                             ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
                                             : 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
                                             }`}
                                     >
-                                        {bot.status === 'running' ? <Square size={16} /> : <Play size={16} />}
-                                        {bot.status === 'running' ? 'Stop' : 'Start'}
+                                        {bot.status === 'RUNNING' ? <Square size={16} /> : <Play size={16} />}
+                                        {bot.status === 'RUNNING' ? 'Stop' : 'Start'}
                                     </button>
                                     <button
-                                        onClick={() => handleEdit(bot.id)}
+                                        onClick={() => bot.id && handleEdit(bot.id)}
                                         className="flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium bg-secondary hover:bg-secondary/80 transition-colors"
                                     >
                                         <Settings size={16} />

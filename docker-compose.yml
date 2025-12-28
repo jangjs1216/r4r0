@@ -40,6 +40,30 @@ services:
     networks:
       - r4r0-net
 
+  # BotService (Bot Configuration & Lifecycle)
+  bot-service:
+    build:
+      context: ./services/bot_service
+      dockerfile: Dockerfile
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8001:8000" # Expose for testing
+    environment:
+      - DATABASE_URL=sqlite:////app/data/bots.db
+    networks:
+      - r4r0-net
+
+  # TradingStrategyViewService (Metadata)
+  trading-strategy-view:
+    build:
+      context: ./services/trading_strategy_view
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8000" # Expose for testing
+    networks:
+      - r4r0-net
+
 networks:
   r4r0-net:
     driver: bridge

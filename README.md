@@ -25,6 +25,8 @@
 ### 3.- **Backend Domain Services**  
   - `AuthService`: **(Key Vault)** API Key의 안전한 암호화 저장소. 코드나 Config 파일이 아닌 로컬 DB(`data/*.db`)에 암호화해 저장하며, 다른 서비스에 서명 기능을 제공하거나 제한적으로 키를 불출함.
   - `ExchangeAdapterService`: 거래소(Binance 등) API 통신 전담. `AuthService`에서 키를 받아 잔고 조회, 주문 실행 등을 수행하며 Rate Limit을 관리함.
+  - `BotService`: 봇 인스턴스의 설정(Config), 상태(Status), 생명주기(Lifecycle)를 관리하는 CRUD 서비스.
+  - `TradingStrategyViewService`: 사용 가능한 전략(Template) 목록과 각 전략의 파라미터 스키마(JSON Schema)를 제공하는 메타데이터 서비스.
   - `PortfolioService`(잔고, 포지션, PnL), `StrategyEngineService`(플러그형 전략 계약), `TradeExecutionService`(주문 라우팅).
 
 ## Contracts & Docs
