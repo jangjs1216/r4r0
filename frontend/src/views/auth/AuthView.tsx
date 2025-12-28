@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../shared/component
 import { Badge } from '../../shared/components/Badge';
 import { Shield, Key, Trash2, Plus, CheckCircle, AlertCircle } from 'lucide-react';
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = '/api';
 
 interface ExchangeKey {
     id: string;

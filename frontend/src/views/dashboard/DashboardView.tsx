@@ -1,122 +1,169 @@
-import { Activity, ArrowUpRight, DollarSign, Wallet } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Activity, DollarSign, BarChart3, ArrowUpRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../shared/components/Card';
-import { Badge } from '../../shared/components/Badge';
+import { useOrchestratorStore } from '../../orchestrator/store';
 import { cn } from '../../lib/utils';
 
 export default function DashboardView() {
+    const { setView } = useOrchestratorStore();
+
+    // State for real data
+    const [netWorth, setNetWorth] = useState<number | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    // Mock PnL data (Backend endpoint for PnL not ready yet)
+    const pnl = 1250.50; // +12.5%
+    const pnlPercent = 12.5;
+
+    useEffect(() => {
+        const fetchTotalBalance = async () => {
+            try {
+                // 1. Fetch Keys
+                // In dev mode (Vite), we might need full URL if proxy isn't set up for localhost:5173 -> localhost:8000/8001
+                // Assuming relative path works via Vite proxy or Nginx.
+
+                const keysRes = await fetch('/api/keys');
+                if (!keysRes.ok) throw new Error('Failed to fetch keys');
+                const keys = await keysRes.json();
+
+                if (keys.length === 0) {
+                    setNetWorth(0);
+                    setLoading(false);
+                    return;
+                }
+
+                // 2. Fetch Balance for each key
+                let total = 0;
+                await Promise.all(keys.map(async (key: any) => {
+                    try {
+                        const balRes = await fetch(`/api/adapter/balance/${key.id}`);
+                        if (balRes.ok) {
+                            const balData = await balRes.json();
+                            total += balData.totalUsdtValue || 0;
+                        }
+                    } catch (err) {
+                        console.error(`Failed to fetch balance for key ${key.id}`, err);
+                    }
+                }));
+
+                setNetWorth(total);
+            } catch (err) {
+                console.error("Dashboard Error:", err);
+                // Fallback to 0 if error, or keep as null to show error state
+                setNetWorth(0);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchTotalBalance();
+    }, []);
+
     return (
-        <div className="p-6 space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-                    <p className="text-muted-foreground mt-1">Overview of your automated trading performance.</p>
-                </div>
-                <div className="flex gap-2">
-                    <Badge variant="outline" className="px-3 py-1 text-sm h-9">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
-                        System Operational
-                    </Badge>
-                </div>
-            </div>
+        <div className="p-6 h-[calc(100vh-4rem)] overflow-y-auto">
+            <h1 className="text-3xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-400">
+                Dashboard
+            </h1>
 
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Balance</CardTitle>
-                        <Wallet className="h-4 w-4 text-muted-foreground" />
+            {/* Top Stats Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <Card className="hover:border-primary/50 transition-colors">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Total Net Worth</CardTitle>
+                        <DollarSign className="h-4 w-4 text-primary" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">$42,350.21</div>
-                        <p className="text-xs text-muted-foreground flex items-center mt-1">
-                            <span className="text-emerald-500 flex items-center mr-1">
-                                <ArrowUpRight className="h-3 w-3" /> +12.5%
-                            </span>
-                            from last month
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Active Bots</CardTitle>
-                        <Activity className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">5</div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            3 Scalping, 2 Arbitrage
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">24h PnL</CardTitle>
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-emerald-500">+$1,240.50</div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            +2.4% daily return
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Open Positions</CardTitle>
-                        <Activity className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">8</div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Exposure: $12,400 (Leverage 1.2x)
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
-
-                {/* Chart Area (Mock) */}
-                <Card className="lg:col-span-4">
-                    <CardHeader>
-                        <CardTitle>PnL Performance</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="h-[300px] flex items-end justify-between gap-1 p-4 bg-secondary/10 rounded-lg border border-dashed border-border/50">
-                            {/* Mock Chart bars */}
-                            {[40, 60, 45, 70, 85, 60, 75, 50, 65, 80, 95, 85, 70, 75, 90, 100, 80, 85, 70, 75, 90, 80, 95, 100].map((h, i) => (
-                                <div key={i} className="w-full bg-primary/20 hover:bg-primary/40 transition-colors rounded-sm" style={{ height: `${h}%` }}></div>
-                            ))}
+                        <div className="text-2xl font-bold">
+                            {loading ? (
+                                <div className="h-8 w-24 bg-secondary/50 animate-pulse rounded" />
+                            ) : (
+                                `$${netWorth?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}`
+                            )}
                         </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            {loading ? "Loading..." : "+2.5% from last month"}
+                        </p>
                     </CardContent>
                 </Card>
 
-                {/* Recent Activity */}
-                <Card className="lg:col-span-3">
+                <Card className="hover:border-primary/50 transition-colors">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Total PnL (24h)</CardTitle>
+                        <Activity className="h-4 w-4 text-green-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-green-500">
+                            +${pnl.toLocaleString()}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            +{pnlPercent}% today
+                        </p>
+                    </CardContent>
+                </Card>
+
+                <Card
+                    className="hover:border-primary/50 transition-colors cursor-pointer group"
+                    onClick={() => setView('bot-config')}
+                >
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-primary transition-colors">Active Bots</CardTitle>
+                        <BarChart3 className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">3</div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            2 Grid, 1 RSI
+                        </p>
+                    </CardContent>
+                </Card>
+
+                <Card
+                    className="hover:border-primary/50 transition-colors cursor-pointer group"
+                    onClick={() => setView('market')}
+                >
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-primary transition-colors">Market Status</CardTitle>
+                        <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-green-500">Bullish</div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            BTC Dominance: 52%
+                        </p>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Main Content Areas */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Chart Area */}
+                <Card className="col-span-1 lg:col-span-2 min-h-[400px]">
                     <CardHeader>
-                        <CardTitle>Recent Bot Activity</CardTitle>
+                        <CardTitle>Portfolio Performance</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex items-center justify-center h-[300px]">
+                        <p className="text-muted-foreground">Chart Component Placeholder</p>
+                    </CardContent>
+                </Card>
+
+                {/* Recent Activity / Logs */}
+                <Card className="col-span-1 min-h-[400px]">
+                    <CardHeader>
+                        <CardTitle>Recent Activity</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
-                            {[
-                                { bot: 'Scalper X', action: 'Bought BTC', time: '2m ago', amount: '+$24.00', type: 'win' },
-                                { bot: 'Arb King', action: 'Sold ETH', time: '15m ago', amount: '+$12.50', type: 'win' },
-                                { bot: 'Scalper X', action: 'Stop Loss SOL', time: '1h ago', amount: '-$8.20', type: 'loss' },
-                                { bot: 'Trend Follower', action: 'Enter Long', time: '2h ago', amount: 'Pending', type: 'neutral' },
-                                { bot: 'Scalper X', action: 'Bought BTC', time: '4h ago', amount: '+$32.10', type: 'win' },
-                            ].map((item, i) => (
-                                <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-secondary/20 hover:bg-secondary/40 transition-colors border border-transparent hover:border-border/50">
+                            {[1, 2, 3, 4, 5].map((i) => (
+                                <div key={i} className="flex items-center justify-between border-b border-border/50 pb-2 last:border-0">
                                     <div className="flex items-center gap-3">
-                                        <div className={cn("w-2 h-2 rounded-full", item.type === 'win' ? 'bg-emerald-500' : item.type === 'loss' ? 'bg-red-500' : 'bg-yellow-500')}></div>
+                                        <div className={cn("w-2 h-2 rounded-full", i % 2 === 0 ? 'bg-green-500' : 'bg-red-500')} />
                                         <div>
-                                            <p className="text-sm font-medium">{item.bot}</p>
-                                            <p className="text-xs text-muted-foreground">{item.action}</p>
+                                            <p className="text-sm font-medium">{i % 2 === 0 ? 'Buy BTC' : 'Sell ETH'}</p>
+                                            <p className="text-xs text-muted-foreground">10:2{i} AM</p>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <p className={cn("text-sm font-bold", item.type === 'win' ? 'text-emerald-500' : item.type === 'loss' ? 'text-red-500' : 'text-foreground')}>{item.amount}</p>
-                                        <p className="text-xs text-muted-foreground">{item.time}</p>
+                                    <div className="text-sm font-medium">
+                                        ${(1000 * i).toLocaleString()}
                                     </div>
                                 </div>
                             ))}

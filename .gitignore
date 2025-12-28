@@ -11,3 +11,6 @@ node_modules/
 dist/
 .idea/
 .vscode/
+
+# Local development scripts
+start_dev.sh

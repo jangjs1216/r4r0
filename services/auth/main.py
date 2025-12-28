@@ -114,6 +114,28 @@ def delete_key(key_id: str, db: Session = Depends(get_db)):
     db.commit()
     return
 
+# --- Internal APIs (For other microservices only) ---
+# In production, restrict this via network policies or internal auth token
+class InternalKeyResponse(BaseModel):
+    exchange: str
+    publicKey: str
+    secretKey: str
+    passphrase: Optional[str] = None
+
+@app.get("/internal/keys/{key_id}/secret", response_model=InternalKeyResponse)
+def get_decrypted_key(key_id: str, db: Session = Depends(get_db)):
+    cred = db.query(StoredCredential).filter(StoredCredential.id == key_id).first()
+    if not cred:
+        raise HTTPException(status_code=404, detail="Key not found")
+    
+    decrypted_secret = decrypt_secret(cred.secret_key_enc)
+    
+    return InternalKeyResponse(
+        exchange=cred.exchange,
+        publicKey=cred.public_key,
+        secretKey=decrypted_secret
+    )
+
 # Health check
 @app.get("/health")
 def health_check():

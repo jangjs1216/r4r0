@@ -1,0 +1,50 @@
+openapi: 3.0.0
+info:
+  title: Exchange Adapter API
+  version: 1.0.0
+paths:
+  /balance/{keyId}:
+    get:
+      summary: Get account balance for a specific key
+      parameters:
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique ID of the key stored in AuthService
+      responses:
+        '200':
+          description: Successful balance retrieval
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountBalance'
+        '400':
+          description: Invalid key or exchange error
+
+components:
+  schemas:
+    AccountBalance:
+      type: object
+      properties:
+        totalUsdtValue:
+          type: number
+          description: Total portfolio value converted to USDT
+        assets:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetBalance'
+            
+    AssetBalance:
+      type: object
+      properties:
+        asset:
+          type: string
+          example: BTC
+        free:
+          type: number
+        locked:
+          type: number
+        usdtValue:
+          type: number

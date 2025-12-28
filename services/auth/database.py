@@ -6,9 +6,14 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 # Database path (relative to the service root execution or absolute)
 # Should be in /home/jangjs/r4r0/data/auth.db
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Go up two levels: services/auth -> services -> root
-ROOT_DIR = os.path.dirname(os.path.dirname(BASE_DIR))
-DB_PATH = os.path.join(ROOT_DIR, "data", "auth.db")
+
+# Allow overriding via environment variable (Crucial for Docker persistence)
+DB_PATH = os.getenv("DB_FILE_PATH")
+
+if not DB_PATH:
+    # Go up two levels: services/auth -> services -> root
+    ROOT_DIR = os.path.dirname(os.path.dirname(BASE_DIR))
+    DB_PATH = os.path.join(ROOT_DIR, "data", "auth.db")
 
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 

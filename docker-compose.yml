@@ -14,7 +14,7 @@ services:
       - r4r0-net
 
   # --- Backend Services ---
-  
+
   # AuthService (Key Manager)
   auth-service:
     build:
@@ -24,6 +24,19 @@ services:
       - ./data:/app/data # Persist SQLite DB
     environment:
       - MASTER_KEY=${MASTER_KEY:-dev_master_key_do_not_use_in_prod}
+      - DB_FILE_PATH=/app/data/auth.db
+    networks:
+      - r4r0-net
+
+  # ExchangeAdapter (Connectivity)
+  exchange-adapter:
+    build:
+      context: .
+      dockerfile: services/exchange_adapter/Dockerfile
+    environment:
+      - AUTH_SERVICE_URL=http://auth-service:8000
+    depends_on:
+      - auth-service
     networks:
       - r4r0-net
 
