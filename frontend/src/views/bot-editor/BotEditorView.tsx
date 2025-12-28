@@ -87,7 +87,7 @@ const SchemaObjectRenderer = ({ schema, value, onChange }: { schema: any, value:
 
 
 const BotEditorView: React.FC = () => {
-    const { setView } = useOrchestratorStore();
+    const { setView, editingBotId } = useOrchestratorStore(); // Get editingBotId
     const [strategies, setStrategies] = useState<StrategyDefinition[]>([]);
     const [exchanges, setExchanges] = useState<ExchangeCredential[]>([]);
     const [loading, setLoading] = useState(true);
@@ -98,37 +98,62 @@ const BotEditorView: React.FC = () => {
         global_settings: { exchange: '', symbol: 'BTC/USDT', mode: 'PAPER', account_allocation: 1000 },
         pipeline: {
             strategy: { id: '', params: {} },
-            risk_management: { stop_loss: 5.0, max_drawdown: 10.0 }, // default values
+            risk_management: { stop_loss: 5.0, max_drawdown: 10.0 },
             execution: { type: 'MAKER_ONLY' }
         }
     });
 
     useEffect(() => {
-        Promise.all([
-            BotService.getStrategies(),
-            BotService.getExchanges()
-        ]).then(([strats, exchs]) => {
-            setStrategies(strats);
-            setExchanges(exchs);
-            // Set default exchange if available
-            if (exchs.length > 0 && !formData.global_settings.exchange) {
-                setFormData(prev => ({
-                    ...prev,
-                    global_settings: { ...prev.global_settings, exchange: exchs[0].id }
-                }));
+        const init = async () => {
+            try {
+                const [strats, exchs] = await Promise.all([
+                    BotService.getStrategies(),
+                    BotService.getExchanges()
+                ]);
+                setStrategies(strats);
+                setExchanges(exchs);
+
+                // If editing, fetch bot data
+                if (editingBotId) {
+                    try {
+                        const bot = await BotService.getBot(editingBotId);
+                        setFormData(bot);
+                    } catch (e) {
+                        console.error("Failed to load bot for editing", e);
+                        alert("Failed to load bot details");
+                    }
+                } else {
+                    // New Bot Defaults
+                    if (exchs.length > 0) {
+                        setFormData(prev => ({
+                            ...prev,
+                            global_settings: { ...prev.global_settings, exchange: exchs[0].id }
+                        }));
+                    }
+                }
+            } catch (e) {
+                console.error("Initialization failed", e);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
-        }).catch(console.error);
-    }, []);
+        };
+
+        init();
+    }, [editingBotId]);
 
     const handleSave = async () => {
         if (!formData.name) return alert("Please enter a bot name");
         if (!formData.pipeline.strategy.id) return alert("Please select a strategy");
 
         try {
-            const saved = await BotService.createBot(formData);
-            alert(`Bot Created Successfully!\nID: ${saved.id}`);
-            setView('bot-config'); // Go back to list
+            if (editingBotId && formData.id) {
+                await BotService.updateBot(formData.id, formData);
+                alert('Bot Updated Successfully!');
+            } else {
+                const saved = await BotService.createBot(formData);
+                alert(`Bot Created Successfully!\nID: ${saved.id}`);
+            }
+            setView('bot-config');
         } catch (e) {
             alert('Failed to save bot. Check console for details.');
             console.error(e);

@@ -39,7 +39,8 @@ export interface ExchangeCredential {
     id: string;
     exchange: string;
     label: string;
-    publicKey: string;
+    publicKey?: string;
+    publicKeyMasked?: string; // Added to match AuthService response
 }
 
 export const BotService = {
@@ -60,24 +61,8 @@ export const BotService = {
             const res = await axios.get('/api/strategies');
             return res.data;
         } catch (e) {
-            console.warn("Using Mock Strategies due to API error", e);
-            // Fallback for demo if backend isn't ready
-            return [
-                {
-                    id: "grid_v1",
-                    name: "Mock Grid",
-                    description: "Mock",
-                    version: "1",
-                    schema: {
-                        type: "object",
-                        properties: {
-                            grid_count: { type: "integer", title: "Grid Count", default: 10 },
-                            upper_price: { type: "number", title: "Upper Price" },
-                            lower_price: { type: "number", title: "Lower Price" }
-                        }
-                    }
-                }
-            ];
+            console.error("Failed to fetch strategies", e);
+            throw e; // Or return empty array, but better to fail if critical
         }
     },
 

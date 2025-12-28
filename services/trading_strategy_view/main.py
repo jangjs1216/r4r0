@@ -9,7 +9,7 @@ class StrategyDefinition(BaseModel):
     name: str
     description: str
     version: str
-    schema_def: Dict[str, Any] = Field(..., alias="schema")  # Map internal 'schema_def' to JSON 'schema'
+    schema: Dict[str, Any]  # Field name matches JSON key exactly (No aliases)
 
 # In-memory strategy definitions (Mock Data)
 STRATEGIES = [
@@ -18,7 +18,7 @@ STRATEGIES = [
         "name": "Classic Grid",
         "description": "Places buy and sell orders at fixed intervals.",
         "version": "1.0.0",
-        "schema_def": {
+        "schema": {
             "type": "object",
             "properties": {
                 "upper_price": {"type": "number", "title": "Upper Price"},
@@ -33,7 +33,7 @@ STRATEGIES = [
         "name": "RSI Reversal",
         "description": "Buys when oversold, sells when overbought based on RSI.",
         "version": "0.5.0",
-        "schema_def": {
+        "schema": {
             "type": "object",
             "properties": {
                 "period": {"type": "integer", "default": 14, "title": "RSI Period"},
