@@ -1,4 +1,5 @@
 import logging
+import json
 from datetime import datetime
 
 logger = logging.getLogger("execution-service.ledger-adapter")
@@ -67,13 +68,39 @@ class LedgerAwareAdapter:
         # 3. COMMIT: Record Global Execution
         if exchange_order.get("status") == "filled":
             try:
-                # Parse details
-                details = exchange_order.get("details", {})
-                exchange_trade_id = str(exchange_order.get("id")) # Default to Order ID
+                # Parse CCXT Unified fields
+                exchange_trade_id = str(exchange_order.get("id"))
                 
-                position_id = None
-                if "info" in details and isinstance(details["info"], dict):
-                    position_id = details["info"].get("positionId")
+                # Get 'info' (raw exchange response) for additional fields
+                info = exchange_order.get("info", {})
+                
+                # Position ID (Futures)
+                position_id = info.get("positionId") if isinstance(info, dict) else None
+                
+                # Fee details from CCXT unified structure
+                fee_obj = exchange_order.get("fee", {})
+                fee_cost = fee_obj.get("cost", 0.0) if fee_obj else 0.0
+                fee_currency = fee_obj.get("currency") if fee_obj else None
+                
+                # Realized PnL (Futures only - from raw info)
+                realized_pnl = None
+                if isinstance(info, dict):
+                    pnl_val = info.get("realizedPnl") or info.get("realizedProfit")
+                    if pnl_val is not None:
+                        try:
+                            realized_pnl = float(pnl_val)
+                        except (ValueError, TypeError):
+                            pass
+                
+                # Position Side (Futures Hedge Mode)
+                position_side = info.get("positionSide") if isinstance(info, dict) else None
+                
+                # Raw response for audit (serialize info dict)
+                raw_response = None
+                try:
+                    raw_response = json.dumps(info) if info else None
+                except (TypeError, ValueError):
+                    pass
 
                 await self.bot_client.record_execution({
                     "local_order_id": local_order["id"],
@@ -81,14 +108,19 @@ class LedgerAwareAdapter:
                     "exchange_order_id": str(exchange_order.get("id")),
                     "position_id": position_id,
                     "symbol": symbol,
+                    "side": side.upper(),
                     "price": exchange_order.get("average") or exchange_order.get("price", 0.0),
                     "quantity": exchange_order.get("filled", amount),
-                    "fee": exchange_order.get("fee", {}).get("cost", 0.0),
+                    "fee": fee_cost,
+                    "fee_currency": fee_currency,
+                    "realized_pnl": realized_pnl,
+                    "position_side": position_side,
+                    "raw_response": raw_response,
                     "timestamp": datetime.utcnow().isoformat()
                 })
                 
                 await self.bot_client.update_order_status(local_order["id"], "FILLED")
-                logger.info(f"✅ [3/3] LEDGER COMMIT: Global Execution Recorded (Trade: {exchange_trade_id}, Pos: {position_id})")
+                logger.info(f"✅ [3/3] LEDGER COMMIT: Global Execution Recorded (Trade: {exchange_trade_id}, PnL: {realized_pnl})")
             
             except Exception as e:
                 logger.error(f"❌ Ledger Commit Failed (Critical): {e}")

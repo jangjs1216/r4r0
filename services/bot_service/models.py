@@ -54,9 +54,23 @@ class GlobalExecution(Base):
     exchange_order_id = Column(String, index=True) # Exchange Order ID
     position_id = Column(String, nullable=True, index=True) # Optional Position ID
     symbol = Column(String)
-    price = Column(Float)
+    side = Column(String)  # BUY/SELL - explicit storage for clarity
+    price = Column(Float)  # Average execution price
     quantity = Column(Float)
-    fee = Column(Float, default=0.0)
+    
+    # Fee details (from CCXT unified structure)
+    fee = Column(Float, default=0.0)  # Kept for backward compatibility
+    fee_currency = Column(String, nullable=True)  # BNB, USDT, etc.
+    
+    # PnL (Futures only, nullable for Spot)
+    realized_pnl = Column(Float, nullable=True)
+    
+    # Position info (Futures Hedge Mode)
+    position_side = Column(String, nullable=True)  # LONG, SHORT, BOTH
+    
+    # Raw response backup for audit/debugging
+    raw_response = Column(Text, nullable=True)  # JSON string of original response
+    
     timestamp = Column(DateTime) # Exchange Time
 
     local_order = relationship("LocalOrder", back_populates="executions")
@@ -106,9 +120,14 @@ class GlobalExecutionCreate(BaseModel):
     exchange_order_id: str
     position_id: Optional[str] = None
     symbol: str
+    side: str  # BUY/SELL
     price: float
     quantity: float
     fee: float = 0.0
+    fee_currency: Optional[str] = None
+    realized_pnl: Optional[float] = None  # Futures only
+    position_side: Optional[str] = None   # LONG/SHORT/BOTH
+    raw_response: Optional[str] = None    # JSON string
     timestamp: datetime
 
 # Helper to reconstruct Pydantic model from DB entity
