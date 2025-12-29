@@ -10,7 +10,7 @@ class BotClient:
     async def get_running_bots(self):
         async with httpx.AsyncClient() as client:
             try:
-                resp = await client.get(f"{BOT_SERVICE_URL}/bots", params={"status": "RUNNING"})
+                resp = await client.get(f"{BOT_SERVICE_URL}/bots", params={"status": "RUNNING,STOPPING"})
                 resp.raise_for_status()
                 return resp.json()
             except httpx.RequestError as exc:
@@ -61,4 +61,44 @@ class BotClient:
                 return True
             except Exception as e:
                 logger.error(f"Failed to record execution: {e}")
+                return False
+
+    async def get_bot_position(self, bot_id):
+        async with httpx.AsyncClient() as client:
+            try:
+                resp = await client.get(f"{BOT_SERVICE_URL}/bots/{bot_id}/position")
+                resp.raise_for_status()
+                return resp.json()
+            except Exception as e:
+                logger.error(f"Failed to get bot position: {e}")
+                return None
+
+    async def update_bot_status(self, bot_id, status):
+        """
+        Updates bot status by fetching current config and PUTting it back with new status.
+        Uses GET -> PUT pattern since PATCH is not available.
+        """
+        async with httpx.AsyncClient() as client:
+            try:
+                # 1. Get current bot info
+                get_resp = await client.get(f"{BOT_SERVICE_URL}/bots/{bot_id}")
+                get_resp.raise_for_status()
+                bot_data = get_resp.json()
+                
+                # 2. Update status in payload
+                # BotUpdate schema expects name, status, global_settings, pipeline
+                payload = {
+                    "name": bot_data["name"],
+                    "status": status,
+                    "global_settings": bot_data["global_settings"],
+                    "pipeline": bot_data["pipeline"]
+                }
+                
+                # 3. PUT update
+                put_resp = await client.put(f"{BOT_SERVICE_URL}/bots/{bot_id}", json=payload)
+                put_resp.raise_for_status()
+                return True
+                
+            except Exception as e:
+                logger.error(f"Failed to update bot status {bot_id} to {status}: {e}")
                 return False

@@ -37,9 +37,20 @@ def get_db():
 def read_bots(skip: int = 0, limit: int = 100, status: str = None, db: Session = Depends(get_db)):
     query = db.query(Bot)
     if status:
-        query = query.filter(Bot.status == status)
+        if "," in status:
+            statuses = status.split(",")
+            query = query.filter(Bot.status.in_(statuses))
+        else:
+            query = query.filter(Bot.status == status)
     bots = query.offset(skip).limit(limit).all()
     return [bot_to_pydantic(bot) for bot in bots]
+
+@app.get("/bots/{bot_id}", response_model=BotResponse)
+def read_bot(bot_id: str, db: Session = Depends(get_db)):
+    db_bot = db.query(Bot).filter(Bot.id == bot_id).first()
+    if db_bot is None:
+        raise HTTPException(status_code=404, detail="Bot not found")
+    return bot_to_pydantic(db_bot)
 
 @app.post("/bots", response_model=BotResponse)
 def create_bot(bot_in: BotCreate, db: Session = Depends(get_db)):
@@ -85,6 +96,37 @@ def update_bot(bot_id: str, bot_in: BotUpdate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_bot)
     return bot_to_pydantic(db_bot)
+
+@app.get("/bots/{bot_id}/position")
+def get_bot_position(bot_id: str, db: Session = Depends(get_db)):
+    """Calculate Net Position based on Global Executions."""
+    executions = db.query(GlobalExecution).join(LocalOrder).filter(LocalOrder.bot_id == bot_id).all()
+    
+    net_qty = 0.0
+    symbol = "UNKNOWN"
+    
+    for exc in executions:
+        symbol = exc.symbol # Assume single symbol for now (or last traded)
+        
+        # If side is available (New Schema), use it.
+        # Fallback to LocalOrder side if missing (Old Schema).
+        side = exc.side
+        if not side and exc.local_order:
+            side = exc.local_order.side
+            
+        if side == "BUY":
+            net_qty += exc.quantity
+        elif side == "SELL":
+            net_qty -= exc.quantity
+            
+    # Round to avoid float precision issues
+    net_qty = round(net_qty, 8)
+    
+    return {
+        "bot_id": bot_id,
+        "symbol": symbol,
+        "net_quantity": net_qty
+    }
 
 @app.delete("/bots/{bot_id}")
 def delete_bot(bot_id: str, db: Session = Depends(get_db)):

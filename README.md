@@ -28,9 +28,9 @@
   - `BotService`: 봇 인스턴스의 설정(Config), 상태(Status), 생명주기(Lifecycle)를 관리하는 CRUD 서비스. 파이프라인(Pipeline) 구조의 설정을 저장.
   - `TradingStrategyViewService`: 사용 가능한 전략(Template) 목록과 각 전략의 파라미터 스키마(JSON Schema)를 제공하는 메타데이터 서비스.
   - `ExecutionService`: **(Core Engine)** 'RUNNING' 상태인 봇을 감지하여 실제 매매 루프(Loop)를 실행하는 워커 서비스.
-    - **BotRunner**: 개별 봇의 격리된 실행 환경.
+    - **BotRunner**: 개별 봇의 격리된 실행 환경. Graceful Stop(종료 시 자동 포지션 청산) 지원.
     - **LedgerAwareAdapter**: 주문 실행 전후의 상태(Pending -> Filled/Failed)를 추적하고 원장에 기록.
-    - **Scheduler**: 주기적인 폴링 및 봇 상태 동기화.
+    - **Scheduler**: 주기적인 폴링 및 봇 상태(RUNNING/STOPPING) 동기화.
   
   *(Note: `StrategyEngine` 및 `TradeExecution` 기능은 현재 `ExecutionService` 내에 통합 구현됨)*
 

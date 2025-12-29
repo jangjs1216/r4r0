@@ -20,30 +20,46 @@ active_runners = {} # bot_id -> BotRunner instance
 async def poll_running_bots():
     """
     Periodic task to sync running bots.
+    Handles RUNNING, STOPPING, and cleanup.
     """
     try:
-        runners_list = await bot_client.get_running_bots()
-        active_ids = {bot['id'] for bot in runners_list}
+        # Fetch bots (RUNNING & STOPPING)
+        bots_data = await bot_client.get_running_bots()
+        bots_map = {b['id']: b for b in bots_data} # ID -> Bot Data
         
-        # 1. Start new bots
-        for bot in runners_list:
-            bid = bot['id']
-            if bid not in active_runners:
-                logger.info(f"Starting new bot runner: {bot['name']} ({bid})")
-                runner = BotRunner(bot, adapter_client, bot_client)
-                await runner.start()
-                active_runners[bid] = runner
+        # 1. Check Existing Runners
+        current_runner_ids = list(active_runners.keys())
+        for bid in current_runner_ids:
+            if bid not in bots_map:
+                # Bot no longer in allowed list (e.g. STOPPED manually or Deleted)
+                logger.info(f"Stopping bot (removed/stopped): {bid}")
+                await active_runners[bid].stop()
+                del active_runners[bid]
+            else:
+                # Bot exists, check status
+                bot = bots_map[bid]
+                if bot['status'] == 'STOPPING':
+                    # Needs Graceful Stop
+                    logger.info(f"Executing Graceful Stop for {bid}")
+                    await active_runners[bid].stop_gracefully()
+                    del active_runners[bid]
+                
+                # If RUNNING, do nothing (keep running)
 
-        # 2. Stop removed/stopped bots
-        current_ids = list(active_runners.keys())
-        for bid in current_ids:
-            if bid not in active_ids:
-                 logger.info(f"Stopping bot (not in running list): {bid}")
-                 runner = active_runners[bid]
-                 await runner.stop()
-                 del active_runners[bid]
+        # 2. Start New Bots / Handle Orphans
+        for bid, bot in bots_map.items():
+            if bot['status'] == 'RUNNING' and bid not in active_runners:
+                 logger.info(f"Starting new runner: {bot['name']} ({bid})")
+                 runner = BotRunner(bot, adapter_client, bot_client)
+                 await runner.start()
+                 active_runners[bid] = runner
+            elif bot['status'] == 'STOPPING' and bid not in active_runners:
+                 # It was STOPPING but we don't have a runner.
+                 # This implies it crashed or never started. 
+                 # Just force status to STOPPED to clean up.
+                 logger.info(f"Bot {bid} found in STOPPING but not running. Forcing STOPPED.")
+                 await bot_client.update_bot_status(bid, "STOPPED")
 
-                 
     except Exception as e:
         logger.error(f"Error in poll loop: {e}")
 

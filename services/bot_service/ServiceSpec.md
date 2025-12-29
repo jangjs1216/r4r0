@@ -61,7 +61,7 @@
 - **Bot**: 봇 엔티티.
   - `id`: UUID (Primary Key)
   - `name`: String
-  - `status`: Enum (STOPPED, RUNNING, PAUSED, ERROR)
+  - `status`: Enum (STOPPED, RUNNING, PAUSED, ERROR, STOPPING)
   - `config`: JSON (전체 파이프라인 설정 저장)
   - `created_at`: Datetime
   - `updated_at`: Datetime
@@ -72,13 +72,17 @@
    - 사용자가 Editor에서 설정 완료 -> `POST /bots` 호출 -> DB 저장 -> 생성된 ID 반환.
 2. **봇 목록 조회**:
    - `BotConfigView` 진입 시 `GET /bots` 호출 -> 이름, 상태, 수익률(별도 집계 시) 등 요약 리스트 반환.
-3. **봇 수정**:
+   - 실행 중인 봇 조회 시 `GET /bots?status=RUNNING,STOPPING` 지원.
+3. **봇 상세 조회**:
+   - `GET /bots/{id}/position` -> 현재 해당 봇의 넷 포지션(보유 수량) 계산 반환.
+4. **봇 수정**:
    - `BotEditorView` 진입 시 `GET /bots/{id}` -> 설정 로드 -> 수정 후 `PUT /bots/{id}`.
 
 ## 5. 변경 이력 (Change Log)
 
 - 2025-12-28: 초기 정의 (Bot Pipeline Plan 기반)
 - 2025-12-28: 이중 원장(Double-Entry Ledger) 시스템을 위한 `LocalOrder`, `GlobalExecution` 모델 및 API 추가
+- 2025-12-29: Graceful Stop을 위한 `STOPPING` 상태 및 Position 조회 API 추가
 
 ---
 

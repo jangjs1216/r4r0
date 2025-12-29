@@ -40,7 +40,7 @@ export default function BotConfigView() {
     const toggleBotStatus = async (bot: BotConfig) => {
         if (!bot.id) return;
 
-        const newStatus: BotConfig['status'] = bot.status === 'RUNNING' ? 'STOPPED' : 'RUNNING';
+        const newStatus: BotConfig['status'] = bot.status === 'RUNNING' ? 'STOPPING' : 'RUNNING';
         const updatedBot: BotConfig = { ...bot, status: newStatus };
 
         try {
@@ -50,8 +50,10 @@ export default function BotConfigView() {
 
             if (newStatus === 'RUNNING') {
                 showToast(`Bot "${bot.name}" is now running!`, 'success');
+            } else if (newStatus === 'STOPPING') {
+                showToast(`Bot "${bot.name}" is stopping gracefully (closing positions)...`, 'success');
             } else {
-                showToast(`Bot "${bot.name}" has been stopped.`, 'success'); // Or 'info'
+                showToast(`Bot "${bot.name}" has been stopped.`, 'success');
             }
         } catch (error) {
             console.error("Failed to toggle status:", error);
@@ -114,14 +116,19 @@ export default function BotConfigView() {
 
                                 <div className="border-t border-border pt-4 flex items-center justify-between gap-3">
                                     <button
+                                        disabled={bot.status === 'STOPPING'}
                                         onClick={() => toggleBotStatus(bot)}
-                                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-colors ${bot.status === 'RUNNING'
+                                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-colors ${bot.status === 'RUNNING' || bot.status === 'STOPPING'
                                             ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
                                             : 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
-                                            }`}
+                                            } ${bot.status === 'STOPPING' ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     >
-                                        {bot.status === 'RUNNING' ? <Square size={16} /> : <Play size={16} />}
-                                        {bot.status === 'RUNNING' ? 'Stop' : 'Start'}
+                                        {bot.status === 'RUNNING' ? <Square size={16} /> :
+                                            bot.status === 'STOPPING' ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div> :
+                                                <Play size={16} />}
+
+                                        {bot.status === 'RUNNING' ? 'Stop' :
+                                            bot.status === 'STOPPING' ? 'Stopping...' : 'Start'}
                                     </button>
                                     <button
                                         onClick={() => bot.id && handleEdit(bot.id)}
