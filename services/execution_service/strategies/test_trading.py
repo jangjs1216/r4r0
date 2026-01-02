@@ -99,13 +99,13 @@ class TestTradingStrategy:
             
             if buy_amount_usdt <= 0:
                 logger.warning("Insufficient USDT balance. Waiting for funds...")
-                return
+                raise ValueError("잔고 부족: USDT 잔고가 0이거나 할당량을 충족할 수 없습니다.")
 
             # Place Order
             ticker_data = await adapter.get_ticker(self.key_id, self.symbol)
             if not ticker_data or 'price' not in ticker_data:
                 logger.error("Failed to get price. Skipping tick.")
-                return
+                raise RuntimeError("가격 조회 실패: 티커 데이터를 가져올 수 없습니다.")
             
             price_val = ticker_data['price']
             limits = ticker_data.get('limits', {})
@@ -120,10 +120,11 @@ class TestTradingStrategy:
             
             if min_notional and calculated_notional < min_notional:
                 logger.warning(f"⚠️ Order amount too small! {calculated_notional:.4f} < {min_notional}")
+                raise ValueError(f"주문 금액 미달: 계산된 주문 금액 {calculated_notional:.4f}가 최소 주문 금액 {min_notional}보다 작습니다.")
 
             if quantity <= 0:
                 logger.warning("Quantity too small.")
-                return
+                raise ValueError("수량 부족: 계산된 주문 수량이 0 이하입니다.")
 
             # --- Place Order via LedgerAwareAdapter ---
             # The adapter is already wrapped, so we just pass the reason.
@@ -141,7 +142,9 @@ class TestTradingStrategy:
                  self.state = "HOLDING"
                  logger.info(f"Buy Filled! Holding for {self.hold_duration}s...")
             else:
-                 logger.error(f"Buy failed: {order}")
+                 msg = f"Buy failed: {order}"
+                 logger.error(msg)
+                 raise RuntimeError(f"주문 실패: {msg}")
 
         # 2. HOLDING -> SELL
         elif self.state == "HOLDING":
@@ -166,4 +169,37 @@ class TestTradingStrategy:
 
             else:
                  logger.info(f"Holding... ({elapsed:.0f}/{self.hold_duration}s)")
+
+    async def on_stop(self, context):
+        """
+        Called when the bot is requested to stop.
+        Clean up resources or close positions.
+        """
+        logger.info(f"[{self.config['name']}] Stopping... Checking for open positions.")
+        
+        adapter = context["adapter"]
+        
+        # If holding a position, liquidate it
+        if self.state == "HOLDING" and self.bought_amount > 0:
+            logger.warning(f"[{self.config['name']}] Forced Liquidation: Selling {self.bought_amount} {self.symbol}...")
+            
+            try:
+                order = await adapter.place_order(
+                    key_id=self.key_id,
+                    symbol=self.symbol,
+                    side="sell",
+                    amount=self.bought_amount,
+                    reason="Forced Stop Liquidation"
+                )
+                
+                if order.get("status") == "filled":
+                    logger.info("Liquidation Filled! Cleanup complete.")
+                    self.state = "FINISHED" # Or STOPPED
+                else:
+                    logger.error(f"Liquidation failed: {order}")
+                    
+            except Exception as e:
+                logger.error(f"Error during liquidation: {e}")
+        else:
+            logger.info("No open positions to close.")
 

@@ -13,7 +13,8 @@ export interface StrategyDefinition {
 export interface BotConfig {
     id?: string;
     name: string;
-    status: 'STOPPED' | 'RUNNING' | 'PAUSED' | 'ERROR';
+    status: 'STOPPED' | 'RUNNING' | 'PAUSED' | 'ERROR' | 'BOOTING' | 'STOPPING';
+    status_message?: string;
     global_settings: {
         exchange: string;
         symbol: string;
@@ -89,5 +90,9 @@ export const BotService = {
     async updateBot(id: string, bot: BotConfig): Promise<BotConfig> {
         const res = await axios.put(`/api/bots/${id}`, bot);
         return res.data;
+    },
+
+    async deleteBot(id: string): Promise<void> {
+        await axios.delete(`/api/bots/${id}`);
     }
 };

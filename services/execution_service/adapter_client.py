@@ -10,7 +10,7 @@ ADAPTER_SERVICE_URL = os.getenv("ADAPTER_SERVICE_URL", "http://exchange-adapter:
 class AdapterClient:
     async def get_balance(self, key_id: str) -> Dict[str, Any]:
         """
-        Fetch account balance via Adapter.
+        어댑터를 통해 계좌 잔고를 조회합니다.
         """
         async with httpx.AsyncClient() as client:
             try:
@@ -24,8 +24,8 @@ class AdapterClient:
 
     async def get_ticker(self, key_id: str, symbol: str) -> Optional[Dict[str, Any]]:
         """
-        Fetch current price via Adapter.
-        Returns the full ticker dictionary, including 'price' and optionally 'limits'.
+        어댑터를 통해 현재가를 조회합니다.
+        'price'와 선택적으로 'limits'를 포함한 전체 티커 딕셔너리를 반환합니다.
         """
         async with httpx.AsyncClient() as client:
             try:
@@ -41,7 +41,7 @@ class AdapterClient:
         
     async def place_order(self, key_id: str, symbol: str, side: str, amount: float, order_type: str = 'market', price: float = None) -> Dict[str, Any]:
         """
-        Place an order via Adapter.
+        어댑터를 통해 주문을 실행합니다.
         """
         async with httpx.AsyncClient() as client:
              try:
