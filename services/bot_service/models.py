@@ -52,12 +52,19 @@ class GlobalExecution(Base):
     id = Column(String, primary_key=True) # Exchange Trade ID
     local_order_id = Column(String, ForeignKey("local_orders.id"), index=True)
     exchange_order_id = Column(String, index=True) # Exchange Order ID
-    position_id = Column(String, nullable=True, index=True) # Optional Position ID
+    order_list_id = Column(String, nullable=True)  # OCO Group ID
     symbol = Column(String)
+    side = Column(String) # BUY / SELL
     price = Column(Float)
     quantity = Column(Float)
+    quote_qty = Column(Float) # Price * Quantity
     fee = Column(Float, default=0.0)
+    fee_asset = Column(String, nullable=True)
     timestamp = Column(DateTime) # Exchange Time
+    
+    # PnL Tracking
+    remaining_qty = Column(Float, default=0.0) # For FIFO Matching
+    realized_pnl = Column(Float, default=0.0)  # For Performance Tracking
 
     local_order = relationship("LocalOrder", back_populates="executions")
 
@@ -104,11 +111,14 @@ class GlobalExecutionCreate(BaseModel):
     local_order_id: str
     exchange_trade_id: str
     exchange_order_id: str
-    position_id: Optional[str] = None
+    order_list_id: Optional[str] = None
     symbol: str
+    side: str
     price: float
     quantity: float
+    quote_qty: float
     fee: float = 0.0
+    fee_asset: Optional[str] = None
     timestamp: datetime
 
 # Helper to reconstruct Pydantic model from DB entity

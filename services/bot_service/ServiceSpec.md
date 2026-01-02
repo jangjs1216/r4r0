@@ -75,10 +75,23 @@
 3. **봇 수정**:
    - `BotEditorView` 진입 시 `GET /bots/{id}` -> 설정 로드 -> 수정 후 `PUT /bots/{id}`.
 
-## 5. 변경 이력 (Change Log)
+## 5. 테스트 및 검증 (Testing & Verification)
+
+### 5.1 FIFO PnL Logic Verification
+- **목표**: 봇 격리(Isolation) 및 선입선출(FIFO) 매칭 로직 정합성 검증.
+- **스크립트**: `services/bot_service/tests/test_pnl.py`
+- **실행 방법**:
+  ```bash
+  sudo docker-compose run --rm --build bot-service python tests/test_pnl.py
+  ```
+
+---
+
+## 6. 변경 이력 (Change Log)
 
 - 2025-12-28: 초기 정의 (Bot Pipeline Plan 기반)
 - 2025-12-28: 이중 원장(Double-Entry Ledger) 시스템을 위한 `LocalOrder`, `GlobalExecution` 모델 및 API 추가
+- 2026-01-02: PnL 추적을 위한 `GlobalExecution` 스키마 확장 (Fills, RemainingQty, RealizedPnL)
 
 ---
 
@@ -95,16 +108,21 @@
   - `status`: Enum (PENDING, SENT, FILLED, FAILED)
   - `reason`: String (매매 근거 - 시각화용)
 
-- **GlobalExecution (글로벌 체결)**: 거래소에서 실제로 체결된 결과.
+- **GlobalExecution (글로벌 체결)**: 거래소에서 실제로 체결된 결과 (개별 Fill 단위).
   - `id`: String (Exchange Trade ID, Primary Key)
   - `local_order_id`: UUID (Foreign Key)
   - `exchange_order_id`: String (Exchange Order ID)
-  - `position_id`: String (Optional)
+  - `order_list_id`: String (OCO Group ID)
   - `symbol`: String
+  - `side`: Enum (BUY, SELL)
   - `price`: Float
   - `quantity`: Float
+  - `quote_qty`: Float (Price * Quantity, 거래 대금)
   - `fee`: Float
+  - `fee_asset`: String (수수료 화폐, 예: BNB, USDT)
   - `timestamp`: DateTime (거래소 체결 시각)
+  - **`remaining_qty`**: Float (FIFO 매칭용 잔여 수량. BUY=qty, SELL=0으로 초기화)
+  - **`realized_pnl`**: Float (실현 손익. SELL 시점에 계산됨)
 
 ### 6.2 Ledger API
 
@@ -132,12 +150,17 @@ Response: `{"id": "local_order_uuid"}`
 ```json
 {
   "local_order_id": "local_order_uuid",
-  "exchange_trade_id": "12345",
+  "exchange_trade_id": "123456",
   "exchange_order_id": "987654",
+  "order_list_id": "-1",
   "symbol": "BTC/USDT",
+  "side": "BUY",
   "price": 50000.0,
-  "quantity": 1.5,
+  "quantity": 0.1,
+  "quote_qty": 5000.0,
   "fee": 0.001,
+  "fee_asset": "BNB",
   "timestamp": "2025-..."
 }
 ```
+Response: `{"ok": true, "realized_pnl": 0.0}`

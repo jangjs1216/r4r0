@@ -57,6 +57,16 @@ class LedgerAwareAdapter:
                 order_type=order_type,
                 price=price
             )
+            
+            # [DEBUG] Log full raw response to identify JSON structure
+            import json
+            try:
+                # Use default=str to handle datetime objects if any
+                raw_log = json.dumps(exchange_order, default=str, indent=2)
+                logger.info(f"🔍 [RAW EXCHANGE RESPONSE]:\n{raw_log}")
+            except Exception as log_err:
+                logger.error(f"Failed to log raw response: {log_err}")
+
             logger.info(f"✅ [2/3] EXCHANGE EXECUTE: Order Sent (ID: {exchange_order.get('id')}, Status: {exchange_order.get('status')})")
             
         except Exception as e:
@@ -64,31 +74,67 @@ class LedgerAwareAdapter:
             await self.bot_client.update_order_status(local_order["id"], "FAILED")
             return {"status": "failed", "reason": str(e)}
 
-        # 3. COMMIT: Record Global Execution
+        # 3. COMMIT: Record Global Execution (Multi-Fill Support)
         if exchange_order.get("status") == "filled":
             try:
-                # Parse details
                 details = exchange_order.get("details", {})
-                exchange_trade_id = str(exchange_order.get("id")) # Default to Order ID
+                info = details.get("info", {})
+                fills = info.get("fills", [])
                 
-                position_id = None
-                if "info" in details and isinstance(details["info"], dict):
-                    position_id = details["info"].get("positionId")
+                # Standard Binance Response with Fills
+                if fills:
+                    for fill in fills:
+                        price = float(fill.get("price", 0.0))
+                        qty = float(fill.get("qty", 0.0))
+                        quote_qty = price * qty
+                        
+                        # Use provided transactTime if available, else current UTC
+                        ts_val = info.get("transactTime")
+                        if ts_val:
+                            # Helper to convert ms timestamp to ISO
+                            ts_iso = datetime.utcfromtimestamp(int(ts_val)/1000).isoformat()
+                        else:
+                            ts_iso = datetime.utcnow().isoformat()
 
-                await self.bot_client.record_execution({
-                    "local_order_id": local_order["id"],
-                    "exchange_trade_id": exchange_trade_id,
-                    "exchange_order_id": str(exchange_order.get("id")),
-                    "position_id": position_id,
-                    "symbol": symbol,
-                    "price": exchange_order.get("average") or exchange_order.get("price", 0.0),
-                    "quantity": exchange_order.get("filled", amount),
-                    "fee": exchange_order.get("fee", {}).get("cost", 0.0),
-                    "timestamp": datetime.utcnow().isoformat()
-                })
+                        payload = {
+                            "local_order_id": local_order["id"],
+                            "exchange_trade_id": str(fill.get("tradeId")),
+                            "exchange_order_id": str(exchange_order.get("id")),
+                            "order_list_id": str(info.get("orderListId")),
+                            "symbol": symbol,
+                            "side": info.get("side", side).upper(),
+                            "price": price,
+                            "quantity": qty,
+                            "quote_qty": quote_qty,
+                            "fee": float(fill.get("commission", 0.0)),
+                            "fee_asset": fill.get("commissionAsset"),
+                            "timestamp": ts_iso
+                        }
+                        
+                        await self.bot_client.record_execution(payload)
+                        logger.info(f"✅ [3/3] LEDGER COMMIT: Recorded Fill {payload['exchange_trade_id']}")
+
+                # Fallback: No Fills (e.g. Simulation or other exchange)
+                else:
+                    logger.warning("⚠️ No 'fills' found in response. Using aggregate execution data.")
+                    payload = {
+                        "local_order_id": local_order["id"],
+                        "exchange_trade_id": str(exchange_order.get("id")), # Fallback ID
+                        "exchange_order_id": str(exchange_order.get("id")),
+                        "order_list_id": None,
+                        "symbol": symbol,
+                        "side": side.upper(),
+                        "price": exchange_order.get("average") or exchange_order.get("price", 0.0),
+                        "quantity": exchange_order.get("filled", amount),
+                        "quote_qty": (exchange_order.get("cost") or 0.0),
+                        "fee": exchange_order.get("fee", {}).get("cost", 0.0),
+                        "fee_asset": exchange_order.get("fee", {}).get("currency"),
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+                    await self.bot_client.record_execution(payload)
+                    logger.info(f"✅ [3/3] LEDGER COMMIT: Recorded Aggregate Execution")
                 
                 await self.bot_client.update_order_status(local_order["id"], "FILLED")
-                logger.info(f"✅ [3/3] LEDGER COMMIT: Global Execution Recorded (Trade: {exchange_trade_id}, Pos: {position_id})")
             
             except Exception as e:
                 logger.error(f"❌ Ledger Commit Failed (Critical): {e}")

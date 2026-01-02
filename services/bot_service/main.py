@@ -113,31 +113,96 @@ def update_order_status(order_id: str, status_update: OrderStatusUpdate, db: Ses
     db.commit()
     return LocalOrderResponse(id=db_order.id, status=db_order.status)
 
+def match_fifo_orders(db: Session, sell_exec: GlobalExecution, bot_id: str):
+    """
+    FIFO Matching Engine with Bot Isolation.
+    Matches a SELL execution against open BUY lots for the specific bot.
+    Updates 'remaining_qty' of BUY lots and calculates 'realized_pnl' for the SELL.
+    """
+    if sell_exec.side != "SELL":
+        return
+
+    # 1. Fetch Open BUY Lots (Isolated by Bot ID)
+    # Ordered by Timestamp ASC (FIFO)
+    buy_lots = db.query(GlobalExecution).join(LocalOrder).filter(
+        GlobalExecution.symbol == sell_exec.symbol,
+        GlobalExecution.side == "BUY",
+        GlobalExecution.remaining_qty > 0,
+        LocalOrder.bot_id == bot_id
+    ).order_by(GlobalExecution.timestamp.asc()).all()
+
+    sell_qty_remain = sell_exec.quantity
+    total_pnl = 0.0
+
+    print(f"[PnL] Matching SELL {sell_exec.id} (Qty: {sell_qty_remain}) for Bot {bot_id}")
+
+    for buy_lot in buy_lots:
+        if sell_qty_remain <= 0:
+            break
+        
+        # Determine match quantity
+        match_qty = min(buy_lot.remaining_qty, sell_qty_remain)
+        
+        # Calculate Gross PnL for this chunk
+        # (Sell Price - Buy Price) * Match Qty
+        pnl_chunk = (sell_exec.price - buy_lot.price) * match_qty
+        total_pnl += pnl_chunk
+        
+        # Update Buy Lot State
+        buy_lot.remaining_qty -= match_qty
+        
+        # Update Sell logic
+        sell_qty_remain -= match_qty
+
+        print(f"  -> Matched {match_qty} from BUY {buy_lot.id} | PnL Chunk: {pnl_chunk:.2f}")
+
+    # 2. Update SELL Execution Result
+    sell_exec.realized_pnl = total_pnl
+    # Note: sell_exec.remaining_qty defaults to 0, which is correct for SELLs (unless shorting)
+    
+    print(f"[PnL] Result: Total Realized PnL = {total_pnl:.2f}, Unmatched Qty = {sell_qty_remain}")
+
+
 @app.post("/executions")
 def record_execution(exec_in: GlobalExecutionCreate, db: Session = Depends(get_db)):
-    print(f"[BotService] Recording Execution: TradeID={exec_in.exchange_trade_id}")
-    # Check if Local Order exists
+    print(f"[BotService] Recording Execution: TradeID={exec_in.exchange_trade_id}, Side={exec_in.side}")
+    
+    # Check if Local Order exists and get Bot ID (For Isolation)
     db_order = db.query(LocalOrder).filter(LocalOrder.id == exec_in.local_order_id).first()
     if not db_order:
         raise HTTPException(status_code=404, detail="Local Order not found")
     
+    # Create Execution Entity with FULL fields
     db_exec = GlobalExecution(
         id=exec_in.exchange_trade_id,
         local_order_id=exec_in.local_order_id,
         exchange_order_id=exec_in.exchange_order_id,
-        position_id=exec_in.position_id,
+        order_list_id=exec_in.order_list_id,
         symbol=exec_in.symbol,
+        side=exec_in.side,
         price=exec_in.price,
         quantity=exec_in.quantity,
+        quote_qty=exec_in.quote_qty,
         fee=exec_in.fee,
-        timestamp=exec_in.timestamp
+        fee_asset=exec_in.fee_asset,
+        timestamp=exec_in.timestamp,
+        remaining_qty=0.0, # Default
+        realized_pnl=0.0   # Default
     )
+    
+    # Logic: Set Remaining Qty for BUY or Run Matching for SELL
+    if db_exec.side == "BUY":
+        db_exec.remaining_qty = db_exec.quantity
+    elif db_exec.side == "SELL":
+        match_fifo_orders(db, db_exec, db_order.bot_id)
     
     try:
         db.add(db_exec)
         db.commit()
     except Exception as e:
         db.rollback()
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=f"Failed to record execution: {str(e)}")
         
-    return {"ok": True}
+    return {"ok": True, "realized_pnl": db_exec.realized_pnl}
