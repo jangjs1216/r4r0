@@ -63,7 +63,7 @@ function StatsPanel({ botId }: { botId: string }) {
             <Card>
                 <CardContent className="pt-6">
                     <p className="text-xs text-muted-foreground uppercase">Profit Factor</p>
-                    <p className="text-2xl font-bold font-mono">{stats?.profit_factor === Infinity ? 'Inf' : stats?.profit_factor?.toFixed(2)}</p>
+                    <p className="text-2xl font-bold font-mono">{stats?.profit_factor === null ? 'Inf' : stats?.profit_factor?.toFixed(2)}</p>
                 </CardContent>
             </Card>
         </div>

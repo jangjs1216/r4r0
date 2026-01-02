@@ -32,6 +32,8 @@ class Bot(Base):
     def get_config(self):
         return json.loads(self.config_json) if self.config_json else {}
 
+    orders = relationship("LocalOrder", back_populates="bot", cascade="all, delete-orphan")
+
 class LocalOrder(Base):
     __tablename__ = "local_orders"
 
@@ -44,6 +46,7 @@ class LocalOrder(Base):
     status = Column(String, default="PENDING") # PENDING, SENT, FILLED, FAILED
     reason = Column(String, nullable=True) # Reason for the order (e.g. "RSI < 30")
 
+    bot = relationship("Bot", back_populates="orders")
     executions = relationship("GlobalExecution", back_populates="local_order")
 
 class GlobalExecution(Base):
@@ -139,5 +142,5 @@ class BotStatsResponse(BaseModel):
     total_pnl: float
     win_rate: float
     total_trades: int
-    profit_factor: float
+    profit_factor: Optional[float]
     average_pnl: float

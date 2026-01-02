@@ -14,7 +14,7 @@ app = FastAPI(title="BotService", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost", "http://localhost:5173", "http://127.0.0.1", "http://localhost:80", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -249,7 +249,7 @@ def get_bot_stats(bot_id: str, db: Session = Depends(get_db)):
     
     # Profit Factor: Gross Profit / Gross Loss
     if gross_loss == 0:
-        profit_factor = float('inf') if gross_profit > 0 else 0.0
+        profit_factor = None if gross_profit > 0 else 0.0
     else:
         profit_factor = gross_profit / gross_loss
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../shared/components/Card';
 import { Badge } from '../../shared/components/Badge';
-import { Play, Settings, Plus, Square } from 'lucide-react';
+import { Play, Settings, Plus, Square, Trash2 } from 'lucide-react';
 import { useOrchestratorStore } from '../../orchestrator/store';
 import { BotService, type BotConfig } from '../bot-editor/api'; // Ensure api.ts exports BotConfig and BotService
 
@@ -59,6 +59,27 @@ export default function BotConfigView() {
         }
     };
 
+    const handleDelete = async (bot: BotConfig) => {
+        if (!bot.id) return;
+        if (bot.status === 'RUNNING') {
+            showToast("Cannot delete a running bot. Stop it first.", 'error');
+            return;
+        }
+
+        if (!window.confirm(`Are you sure you want to delete bot "${bot.name}"? This action cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            await BotService.deleteBot(bot.id);
+            setBots(prev => prev.filter(b => b.id !== bot.id));
+            showToast(`Bot "${bot.name}" deleted successfully.`, 'success');
+        } catch (error) {
+            console.error("Failed to delete bot:", error);
+            showToast("Failed to delete bot.", 'error');
+        }
+    };
+
     return (
         <div className="p-6 h-[calc(100vh-4rem)] flex flex-col gap-6 relative">
             {/* Simple Toast Notification */}
@@ -93,9 +114,18 @@ export default function BotConfigView() {
                             <CardTitle className="text-lg font-bold flex items-center gap-2">
                                 {bot.name}
                             </CardTitle>
-                            <Badge variant={bot.status === 'RUNNING' ? 'default' : 'secondary'} className="capitalize">
-                                {bot.status}
-                            </Badge>
+                            <div className="flex items-center gap-3">
+                                <Badge variant={bot.status === 'RUNNING' ? 'default' : 'secondary'} className="capitalize">
+                                    {bot.status}
+                                </Badge>
+                                <button
+                                    onClick={() => handleDelete(bot)}
+                                    className="text-muted-foreground hover:text-red-500 transition-colors p-1 rounded-md hover:bg-secondary"
+                                    title="Delete Bot"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
@@ -139,7 +169,7 @@ export default function BotConfigView() {
                 {/* Empty State / Add Placeholder */}
                 <button
                     onClick={handleCreate}
-                    className="border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-4 text-muted-foreground hover:text-primary hover:border-primary/50 hover:bg-primary/5 transition-all min-h-[250px]"
+                    className="border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-4 text-muted-foreground hover:text-primary hover:border-primary/50 hover:bg-primary/50 transition-all min-h-[250px]"
                 >
                     <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center">
                         <Plus size={24} />

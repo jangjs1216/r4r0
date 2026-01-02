@@ -89,5 +89,9 @@ export const BotService = {
     async updateBot(id: string, bot: BotConfig): Promise<BotConfig> {
         const res = await axios.put(`/api/bots/${id}`, bot);
         return res.data;
+    },
+
+    async deleteBot(id: string): Promise<void> {
+        await axios.delete(`/api/bots/${id}`);
     }
 };
