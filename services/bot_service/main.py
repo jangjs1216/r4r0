@@ -235,7 +235,7 @@ def get_bot_stats(bot_id: str, db: Session = Depends(get_db)):
     gross_loss = 0.0
 
     for exc in sell_execs:
-        pnl = exc.realized_pnl
+        pnl = exc.realized_pnl or 0.0
         total_pnl += pnl
         
         if pnl > 0:
