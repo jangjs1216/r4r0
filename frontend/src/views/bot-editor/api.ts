@@ -13,7 +13,8 @@ export interface StrategyDefinition {
 export interface BotConfig {
     id?: string;
     name: string;
-    status: 'STOPPED' | 'RUNNING' | 'PAUSED' | 'ERROR';
+    status: 'STOPPED' | 'RUNNING' | 'PAUSED' | 'ERROR' | 'BOOTING' | 'STOPPING';
+    status_message?: string;
     global_settings: {
         exchange: string;
         symbol: string;

@@ -61,7 +61,7 @@
 - **Bot**: 봇 엔티티.
   - `id`: UUID (Primary Key)
   - `name`: String
-  - `status`: Enum (STOPPED, RUNNING, PAUSED, ERROR)
+  - `status`: Enum (STOPPED, BOOTING, RUNNING, STOPPING)
   - `config`: JSON (전체 파이프라인 설정 저장)
   - `created_at`: Datetime
   - `updated_at`: Datetime
@@ -92,6 +92,7 @@
 - 2025-12-28: 초기 정의 (Bot Pipeline Plan 기반)
 - 2025-12-28: 이중 원장(Double-Entry Ledger) 시스템을 위한 `LocalOrder`, `GlobalExecution` 모델 및 API 추가
 - 2026-01-02: PnL 추적을 위한 `GlobalExecution` 스키마 확장 (Fills, RemainingQty, RealizedPnL)
+- 2026-01-03: `BOOTING` 및 `STOPPING` 상태 추가 (Graceful Lifecycle)
 
 ---
 

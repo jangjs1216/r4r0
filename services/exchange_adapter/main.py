@@ -7,7 +7,7 @@ from typing import List, Optional
 
 app = FastAPI(title="Exchange Adapter Service", version="1.0.0")
 
-# AuthService URL (Internal Docker Network)
+# AuthService URL (내부 도커 네트워크)
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth-service:8000")
 
 class AssetBalance(BaseModel):
@@ -31,7 +31,7 @@ async def get_exchange_client(exchange_id: str, api_key: str, secret: str):
         'secret': secret,
         'enableRateLimit': True,
         'options': {
-            'adjustForTimeDifference': True, # Keep local time synced with server time
+            'adjustForTimeDifference': True, # 서버 시간과 로컬 시간 동기화 유지
             'defaultType': 'spot' 
         }
     })
@@ -52,10 +52,10 @@ async def get_balance(key_id: str):
         except httpx.RequestError as exc:
             raise HTTPException(status_code=503, detail=f"AuthService unavailable: {exc}")
 
-    # 2. Connect to Exchange
+    # 2. 거래소 연결
     exchange_id = creds['exchange']
     
-    # Debug: Check External IP
+    # 디버그: 외부 IP 확인 (API 화이트리스트 검증용)
     try:
         async with httpx.AsyncClient() as ip_client:
             ip_resp = await ip_client.get('https://api.ipify.org')
@@ -68,12 +68,12 @@ async def get_balance(key_id: str):
     exchange = await get_exchange_client(exchange_id, creds['publicKey'], creds['secretKey'])
     
     try:
-        # 3. Connection & Time Sync Check
-        # load_markets() will sync time via 'adjustForTimeDifference'
+        # 3. 연결 및 시간 동기화 확인
+        # load_markets()가 'adjustForTimeDifference' 옵션을 통해 시간 동기화를 수행함
         await exchange.load_markets() 
-        print(f"[INFO] Successfully connected to {exchange_id}. Time sync complete.")
+        print(f"[정보] {exchange_id} 연결 성공. 시간 동기화 완료.")
 
-        # 4. Fetch Balance
+        # 4. 잔고 조회
         print(f"[INFO] Fetching balance for key {key_id}...")
         balance = await exchange.fetch_balance()
         #print(f"[DEBUG] Raw Balance for key {key_id}: {balance}")
@@ -83,19 +83,19 @@ async def get_balance(key_id: str):
         total_usdt = 0.0
         
         if 'total' in balance:
-            # First, identify all non-zero assets
+            # 먼저, 0보다 큰 자산만 식별
             non_zero_assets = {
                 curr: amt for curr, amt in balance['total'].items() 
                 if amt > 0
             }
 
-            # Prepare list of symbols to fetch prices for (e.g. BTC/USDT)
-            # We assume USDT is the quote currency.
+            # 현재가를 조회할 심볼 목록 준비 (예: BTC/USDT)
+            # 기축 통화(Quote Currency)는 USDT로 가정
             symbols_to_fetch = []
             for currency in non_zero_assets.keys():
                 if currency != 'USDT':
-                    # Check if market exists (some small assets might not have USDT pair)
-                    # We try common pair formats.
+                    # 마켓이 존재하는지 확인 (소규모 코인은 USDT 페어가 없을 수 있음)
+                    # 일반적인 페어 형식을 시도
                     symbol = f"{currency}/USDT"
                     if symbol in exchange.markets:
                         symbols_to_fetch.append(symbol)
@@ -137,8 +137,6 @@ async def get_balance(key_id: str):
         
         return AccountBalance(totalUsdtValue=total_usdt, assets=assets)
 
-        return AccountBalance(totalUsdtValue=total_usdt, assets=assets)
-
     except Exception as e:
         import datetime
         print(f"[ERROR] Time: {datetime.datetime.now()} | Exchange Error: {exchange_id} {str(e)}")
@@ -157,8 +155,8 @@ class OrderRequest(BaseModel):
     price: Optional[float] = None
 
 @app.get("/market/ticker")
-async def get_ticker(key_id: str, symbol: str):    # Require key_id to determine exchange context
-    # 1. Get Credentials (for exchange routing, mostly)
+async def get_ticker(key_id: str, symbol: str):    # 거래소 컨텍스트를 파악하기 위해 key_id 필요
+    # 1. 자격 증명 조회 (주로 거래소 라우팅 용도)
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.get(f"{AUTH_SERVICE_URL}/internal/keys/{key_id}/secret")
@@ -172,11 +170,11 @@ async def get_ticker(key_id: str, symbol: str):    # Require key_id to determine
     exchange = await get_exchange_client(exchange_id, creds['publicKey'], creds['secretKey'])
     
     try:
-        # Load markets to get limits
+        # 마켓 정보를 로드하여 제약조건(Limits) 확인
         await exchange.load_markets()
         ticker = await exchange.fetch_ticker(symbol)
         
-        # Extract Limits
+        # 제약조건(Limits) 추출
         market = exchange.market(symbol)
         min_notional = market.get('limits', {}).get('cost', {}).get('min')
         min_amount = market.get('limits', {}).get('amount', {}).get('min')
@@ -210,9 +208,9 @@ async def place_order(order: OrderRequest):
     exchange = await get_exchange_client(exchange_id, creds['publicKey'], creds['secretKey'])
 
     try:
-        # 2. Place Order
-        print(f"[INFO] Placing {order.side} order for {order.symbol} amount={order.amount}")
-        # CCXT create_order signature: (symbol, type, side, amount, price=None, params={})
+        # 2. 주문 실행
+        print(f"[정보] {order.symbol} {order.side} 주문 실행 (수량: {order.amount})")
+        # CCXT create_order 시그니처: (symbol, type, side, amount, price=None, params={})
         result = await exchange.create_order(
             symbol=order.symbol,
             type=order.order_type,

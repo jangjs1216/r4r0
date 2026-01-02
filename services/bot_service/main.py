@@ -38,7 +38,7 @@ def read_bots(skip: int = 0, limit: int = 100, status: str = None, db: Session =
 
 @app.post("/bots", response_model=BotResponse)
 def create_bot(bot_in: BotCreate, db: Session = Depends(get_db)):
-    # Serialize config parts to JSON storage
+    # 설정(Config) 데이터를 JSON 저장용 딕셔너리로 직렬화
     config_dict = {
         "global_settings": bot_in.global_settings,
         "pipeline": bot_in.pipeline
@@ -122,9 +122,9 @@ def update_order_status(order_id: str, status_update: OrderStatusUpdate, db: Ses
 
 def match_fifo_orders(db: Session, sell_exec: GlobalExecution, bot_id: str):
     """
-    FIFO Matching Engine with Bot Isolation.
-    Matches a SELL execution against open BUY lots for the specific bot.
-    Updates 'remaining_qty' of BUY lots and calculates 'realized_pnl' for the SELL.
+    봇별 격리(Isolated)를 지원하는 선입선출(FIFO) 매칭 엔진입니다.
+    SELL 체결 건을 해당 봇의 미청산 BUY 건들과 매칭하여,
+    BUY 건의 'remaining_qty'를 차감하고 SELL 건의 'realized_pnl'(실현 손익)을 계산합니다.
     """
     if sell_exec.side != "SELL":
         return
@@ -147,15 +147,15 @@ def match_fifo_orders(db: Session, sell_exec: GlobalExecution, bot_id: str):
         if sell_qty_remain <= 0:
             break
         
-        # Determine match quantity
+        # 매칭 수량 결정
         match_qty = min(buy_lot.remaining_qty, sell_qty_remain)
         
-        # Calculate Gross PnL for this chunk
-        # (Sell Price - Buy Price) * Match Qty
+        # 해당 청크에 대한 총 손익(Gross PnL) 계산
+        # (매도 단가 - 매수 단가) * 매칭 수량
         pnl_chunk = (sell_exec.price - buy_lot.price) * match_qty
         total_pnl += pnl_chunk
         
-        # Update Buy Lot State
+        # BUY Lot 상태 업데이트 (잔여 수량 차감)
         buy_lot.remaining_qty -= match_qty
         
         # Update Sell logic
@@ -217,8 +217,8 @@ def record_execution(exec_in: GlobalExecutionCreate, db: Session = Depends(get_d
 @app.get("/bots/{bot_id}/stats", response_model=BotStatsResponse)
 def get_bot_stats(bot_id: str, db: Session = Depends(get_db)):
     """
-    Calculate aggregated statistics for a specific bot.
-    Stats are derived from realized PnL of SELL executions.
+    특정 봇의 누적 통계를 계산합니다.
+    통계는 SELL 체결 건들의 실현 손익(realized PnL)을 집계하여 도출됩니다.
     """
     print(f"[BotService] Calculating Stats for Bot: {bot_id}")
     

@@ -21,8 +21,9 @@ class Bot(Base):
 
     id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, index=True)
-    status = Column(String, default="STOPPED")
-    config_json = Column(Text) # Stores the full JSON config
+    status = Column(String, default="STOPPED") # STOPPED, BOOTING, RUNNING, STOPPING
+    status_message = Column(String, nullable=True) # UI 표시용 상태 메시지
+    config_json = Column(Text) # 전체 JSON 설정 저장
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -44,7 +45,7 @@ class LocalOrder(Base):
     quantity = Column(Float)
     timestamp = Column(DateTime, default=datetime.utcnow)
     status = Column(String, default="PENDING") # PENDING, SENT, FILLED, FAILED
-    reason = Column(String, nullable=True) # Reason for the order (e.g. "RSI < 30")
+    reason = Column(String, nullable=True) # 주문 사유 (예: "RSI < 30")
 
     bot = relationship("Bot", back_populates="orders")
     executions = relationship("GlobalExecution", back_populates="local_order")
@@ -63,11 +64,11 @@ class GlobalExecution(Base):
     quote_qty = Column(Float) # Price * Quantity
     fee = Column(Float, default=0.0)
     fee_asset = Column(String, nullable=True)
-    timestamp = Column(DateTime) # Exchange Time
+    timestamp = Column(DateTime) # 거래소 체결 시간
     
-    # PnL Tracking
-    remaining_qty = Column(Float, default=0.0) # For FIFO Matching
-    realized_pnl = Column(Float, default=0.0)  # For Performance Tracking
+    # PnL(손익) 추적용 필드
+    remaining_qty = Column(Float, default=0.0) # FIFO 매칭을 위한 잔여 수량
+    realized_pnl = Column(Float, default=0.0)  # 성과 추적을 위한 실현 손익
 
     local_order = relationship("LocalOrder", back_populates="executions")
 
@@ -76,7 +77,8 @@ class GlobalExecution(Base):
 
 class BotBase(BaseModel):
     name: str
-    status: str = "STOPPED"
+    status: str = "STOPPED"  # STOPPED, BOOTING, RUNNING, STOPPING
+    status_message: Optional[str] = None
     global_settings: Dict[str, Any] = {}
     pipeline: Dict[str, Any] = {}
 
@@ -124,20 +126,21 @@ class GlobalExecutionCreate(BaseModel):
     fee_asset: Optional[str] = None
     timestamp: datetime
 
-# Helper to reconstruct Pydantic model from DB entity
+# DB 엔티티를 Pydantic 모델로 변환하는 헬퍼 함수
 def bot_to_pydantic(bot: Bot) -> BotResponse:
     config = bot.get_config()
     return BotResponse(
         id=bot.id,
         name=bot.name,
         status=bot.status,
+        status_message=bot.status_message,
         global_settings=config.get("global_settings", {}),
         pipeline=config.get("pipeline", {}),
         created_at=bot.created_at,
         updated_at=bot.updated_at
     )
 
-# --- Stats Schemas ---
+# --- 통계(Stats) 스키마 ---
 class BotStatsResponse(BaseModel):
     total_pnl: float
     win_rate: float

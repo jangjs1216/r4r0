@@ -20,15 +20,47 @@ export default function BotConfigView() {
 
     const [bots, setBots] = useState<BotConfig[]>([]);
 
-    useEffect(() => {
-        BotService.getAllBots().then(setBots).catch(console.error);
+    const [processingBots, setProcessingBots] = useState<Set<string>>(new Set());
+    const [elapsedTimes, setElapsedTimes] = useState<Record<string, number>>({});
 
-        // Optional: Poll every 5s
-        const interval = setInterval(() => {
-            BotService.getAllBots().then(setBots).catch(console.error);
-        }, 5000);
+    useEffect(() => {
+        const fetchBots = async () => {
+            try {
+                const latestBots = await BotService.getAllBots();
+                setBots(prev => {
+                    // Only update bots that are NOT currently being processed locally
+                    // This prevents the global poll from overwriting "BOOTING/STOPPING" optimistic states
+                    // with stale "STOPPED/RUNNING" states from the server.
+
+                    // Create a map of latest data
+                    const latestMap = new Map(latestBots.map(b => [b.id, b]));
+
+                    // Filter out bots that are no longer present in latestBots
+                    const filteredPrev = prev.filter(prevBot => prevBot.id && latestMap.has(prevBot.id));
+
+                    const updatedBots = filteredPrev.map(prevBot => {
+                        // If this bot is being processed (button clicked), keep local state
+                        if (prevBot.id && processingBots.has(prevBot.id)) {
+                            return prevBot;
+                        }
+                        // Otherwise, accept server state
+                        return latestMap.get(prevBot.id!) || prevBot; // Should always find if filteredPrev
+                    });
+
+                    // Add new bots that weren't in prev
+                    const newBots = latestBots.filter(lb => !prev.some(pb => pb.id === lb.id));
+
+                    return [...updatedBots, ...newBots];
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        };
+
+        fetchBots();
+        const interval = setInterval(fetchBots, 5000);
         return () => clearInterval(interval);
-    }, []);
+    }, [processingBots]); // Re-create poll function if processing set changes (or use ref)
 
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -40,22 +72,94 @@ export default function BotConfigView() {
     const toggleBotStatus = async (bot: BotConfig) => {
         if (!bot.id) return;
 
-        const newStatus: BotConfig['status'] = bot.status === 'RUNNING' ? 'STOPPED' : 'RUNNING';
-        const updatedBot: BotConfig = { ...bot, status: newStatus };
+        if (bot.status === 'BOOTING' || bot.status === 'STOPPING') return;
+
+        // Mark as processing to block global poller
+        setProcessingBots(prev => {
+            const next = new Set(prev);
+            next.add(bot.id!);
+            return next;
+        });
+
+        // Init elapsed time
+        setElapsedTimes(prev => ({ ...prev, [bot.id!]: 0 }));
+
+        const isStarting = bot.status === 'STOPPED';
+        const intermediateState = isStarting ? 'BOOTING' : 'STOPPING';
+        const targetState = isStarting ? 'RUNNING' : 'STOPPED';
+
+        // 1. Optimistic UI update
+        setBots(prev => prev.map(b => b.id === bot.id ? { ...b, status: intermediateState } : b));
 
         try {
-            await BotService.updateBot(bot.id, updatedBot);
-            // Optimistic UI update or wait for re-fetch
-            setBots(prev => prev.map(b => b.id === bot.id ? updatedBot : b));
+            // 2. Call API
+            await BotService.updateBot(bot.id, { ...bot, status: intermediateState });
 
-            if (newStatus === 'RUNNING') {
-                showToast(`Bot "${bot.name}" is now running!`, 'success');
-            } else {
-                showToast(`Bot "${bot.name}" has been stopped.`, 'success'); // Or 'info'
+            // 3. Verification Loop
+            let success = false;
+            const TIMEOUT_SEC = 30;
+            const POLL_INTERVAL_MS = 1000;
+            let seconds = 0;
+
+            // Loop until success or timeout
+            while (seconds < TIMEOUT_SEC) {
+                await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+                seconds++;
+                setElapsedTimes(prev => ({ ...prev, [bot.id!]: seconds }));
+
+                // Poll backend every 2 seconds (roughly 0, 2, 4...)
+                if (seconds % 2 === 0) {
+                    try {
+                        const latest = await BotService.getBot(bot.id);
+
+                        // Update our view of this specific bot
+                        if (latest.status === targetState) {
+                            setBots(prev => prev.map(b => b.id === bot.id ? latest : b));
+                            showToast(`Bot "${bot.name}" is now ${targetState}!`, 'success');
+                            success = true;
+                            break;
+                        }
+
+                        // If error or unexpected state
+                        if (latest.status !== intermediateState) {
+                            setBots(prev => prev.map(b => b.id === bot.id ? latest : b));
+                            const errorMsg = latest.status_message ? `Error: ${latest.status_message}` : `Unexpected status change: ${latest.status}`;
+                            showToast(errorMsg, 'error');
+                            success = true; // Exit loop (as failed)
+                            break;
+                        }
+                    } catch (e) {
+                        console.warn("Polling check failed", e);
+                    }
+                }
             }
+
+            if (!success) {
+                showToast(`Timed out waiting for ${intermediateState} -> ${targetState} (30s)`, 'error');
+                // One last check
+                try {
+                    const finalBot = await BotService.getBot(bot.id);
+                    setBots(prev => prev.map(b => b.id === bot.id ? finalBot : b));
+                } catch { }
+            }
+
         } catch (error) {
             console.error("Failed to toggle status:", error);
-            showToast("Failed to update bot status.", 'error');
+            setBots(prev => prev.map(b => b.id === bot.id ? bot : b)); // Revert
+            showToast("Failed to initiate bot status update.", 'error');
+        } finally {
+            // Release lock
+            setProcessingBots(prev => {
+                const next = new Set(prev);
+                next.delete(bot.id!);
+                return next;
+            });
+            // Cleanup elapsed time
+            setElapsedTimes(prev => {
+                const next = { ...prev };
+                delete next[bot.id!];
+                return next;
+            });
         }
     };
 
@@ -142,16 +246,33 @@ export default function BotConfigView() {
                                     </div>
                                 </div>
 
+                                {bot.status_message && (
+                                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded p-2 flex items-start gap-2 text-xs text-yellow-200">
+                                        <div className="mt-0.5 min-w-fit">⚠️</div>
+                                        <span>{bot.status_message}</span>
+                                    </div>
+                                )}
+
                                 <div className="border-t border-border pt-4 flex items-center justify-between gap-3">
                                     <button
                                         onClick={() => toggleBotStatus(bot)}
-                                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-colors ${bot.status === 'RUNNING'
+                                        disabled={bot.status === 'BOOTING' || bot.status === 'STOPPING'}
+                                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-all duration-200 ${bot.status === 'RUNNING' || bot.status === 'STOPPING'
                                             ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
-                                            : 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
-                                            }`}
+                                            : bot.status === 'BOOTING'
+                                                ? 'bg-yellow-500/10 text-yellow-500 cursor-wait'
+                                                : 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
+                                            } ${bot.status === 'BOOTING' || bot.status === 'STOPPING' ? 'opacity-80' : ''}`}
                                     >
-                                        {bot.status === 'RUNNING' ? <Square size={16} /> : <Play size={16} />}
-                                        {bot.status === 'RUNNING' ? 'Stop' : 'Start'}
+                                        {(bot.status === 'BOOTING' || bot.status === 'STOPPING') ? (
+                                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                        ) : (
+                                            bot.status === 'RUNNING' ? <Square size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />
+                                        )}
+                                        {bot.status === 'RUNNING' ? 'Stop'
+                                            : bot.status === 'BOOTING' ? `Booting... (${elapsedTimes[bot.id!] || 0}s)`
+                                                : bot.status === 'STOPPING' ? `Stopping... (${elapsedTimes[bot.id!] || 0}s)`
+                                                    : 'Start'}
                                     </button>
                                     <button
                                         onClick={() => bot.id && handleEdit(bot.id)}

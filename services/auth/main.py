@@ -15,7 +15,7 @@ app = FastAPI(title="AuthService (Key Manager)", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, restrict this to frontend domain
+    allow_origins=["*"], # 프로덕션 환경에서는 프론트엔드 도메인으로 제한해야 함
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -71,14 +71,14 @@ def list_keys(db: Session = Depends(get_db)):
             label=c.label,
             publicKeyMasked=mask_key(c.public_key),
             status=c.status,
-            permissions=["read", "trade"], # Mock permissions for now
+            permissions=["read", "trade"], # 현재는 모의 권한(Mock)
             createdAt=c.created_at
         ))
     return results
 
 @app.post("/keys", status_code=status.HTTP_201_CREATED, response_model=ExchangeKeySummary)
 def register_key(req: RegisterKeyRequest, db: Session = Depends(get_db)):
-    # Encrypt secret
+    # 비밀 키 암호화
     enc_secret = encrypt_secret(req.secretKey)
     
     new_cred = StoredCredential(
@@ -114,8 +114,8 @@ def delete_key(key_id: str, db: Session = Depends(get_db)):
     db.commit()
     return
 
-# --- Internal APIs (For other microservices only) ---
-# In production, restrict this via network policies or internal auth token
+# --- 내부 API (마이크로서비스 전용) ---
+# 프로덕션에서는 네트워크 정책이나 내부 인증 토큰으로 접근을 제한해야 함
 class InternalKeyResponse(BaseModel):
     exchange: str
     publicKey: str
