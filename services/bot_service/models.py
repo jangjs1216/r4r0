@@ -133,3 +133,11 @@ def bot_to_pydantic(bot: Bot) -> BotResponse:
         created_at=bot.created_at,
         updated_at=bot.updated_at
     )
+
+# --- Stats Schemas ---
+class BotStatsResponse(BaseModel):
+    total_pnl: float
+    win_rate: float
+    total_trades: int
+    profit_factor: float
+    average_pnl: float

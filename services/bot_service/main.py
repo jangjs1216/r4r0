@@ -5,10 +5,8 @@ from models import (
     Base, engine, SessionLocal, 
     Bot, BotCreate, BotUpdate, BotResponse, bot_to_pydantic,
     LocalOrder, LocalOrderCreate, LocalOrderResponse, OrderStatusUpdate,
-    GlobalExecution, GlobalExecutionCreate
+    GlobalExecution, GlobalExecutionCreate, BotStatsResponse
 )
-
-# Create Tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="BotService", version="1.0.0")
@@ -206,3 +204,50 @@ def record_execution(exec_in: GlobalExecutionCreate, db: Session = Depends(get_d
         raise HTTPException(status_code=400, detail=f"Failed to record execution: {str(e)}")
         
     return {"ok": True, "realized_pnl": db_exec.realized_pnl}
+
+@app.get("/bots/{bot_id}/stats", response_model=BotStatsResponse)
+def get_bot_stats(bot_id: str, db: Session = Depends(get_db)):
+    """
+    Calculate aggregated statistics for a specific bot.
+    Stats are derived from realized PnL of SELL executions.
+    """
+    print(f"[BotService] Calculating Stats for Bot: {bot_id}")
+    
+    # 1. Fetch all SELL executions for this bot (completed trades)
+    sell_execs = db.query(GlobalExecution).join(LocalOrder).filter(
+        LocalOrder.bot_id == bot_id,
+        GlobalExecution.side == "SELL"
+    ).all()
+
+    total_pnl = 0.0
+    wins = 0
+    total_trades = len(sell_execs)
+    gross_profit = 0.0
+    gross_loss = 0.0
+
+    for exc in sell_execs:
+        pnl = exc.realized_pnl
+        total_pnl += pnl
+        
+        if pnl > 0:
+            wins += 1
+            gross_profit += pnl
+        else:
+            gross_loss += abs(pnl) # Absolute value for PF calculation
+
+    win_rate = (wins / total_trades) if total_trades > 0 else 0.0
+    average_pnl = (total_pnl / total_trades) if total_trades > 0 else 0.0
+    
+    # Profit Factor: Gross Profit / Gross Loss
+    if gross_loss == 0:
+        profit_factor = float('inf') if gross_profit > 0 else 0.0
+    else:
+        profit_factor = gross_profit / gross_loss
+
+    return BotStatsResponse(
+        total_pnl=total_pnl,
+        win_rate=win_rate,
+        total_trades=total_trades,
+        profit_factor=profit_factor,
+        average_pnl=average_pnl
+    )

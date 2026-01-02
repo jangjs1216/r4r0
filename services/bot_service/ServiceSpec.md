@@ -164,3 +164,26 @@ Response: `{"id": "local_order_uuid"}`
 }
 ```
 Response: `{"ok": true, "realized_pnl": 0.0}`
+
+---
+
+## 7. 통계 API (Statistics & Analysis)
+
+**GET /bots/{bot_id}/stats**
+- 봇의 전체 성과 요약 (또는 기간별)
+- Query Params: `start_date`, `end_date`
+- Response:
+```json
+{
+  "total_pnl": 150.0,          // 누적 실현 손익 (USDT)
+  "win_rate": 0.65,            // 승률 (0~1)
+  "total_trades": 20,          // 총 매도(청산) 횟수
+  "profit_factor": 1.5,        // 총이익 / 총손실
+  "average_pnl": 7.5           // 평균 손익
+}
+```
+
+**GET /bots/{bot_id}/sessions** (준비 중)
+- 봇의 실행 세션(Start~Stop) 이력 조회
+- Response: `[ { "session_id": "...", "start_time": "...", "end_time": "...", "session_pnl": 50.0 } ]`
+

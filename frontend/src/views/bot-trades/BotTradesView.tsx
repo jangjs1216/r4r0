@@ -1,64 +1,138 @@
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
 import { Card, CardHeader, CardTitle, CardContent } from '../../shared/components/Card';
-import { Badge } from '../../shared/components/Badge';
+import { Badge } from '../../shared/components/Badge'; // Fixed path
+import { ArrowLeft, TrendingUp, Activity, DollarSign } from 'lucide-react';
 
-export default function BotTradesView() {
-    const trades = [
-        { id: 'TX-9921', bot: 'Scalper Alpha', pair: 'BTC/USDT', side: 'buy', price: '42,150.00', size: '0.25', time: '12:04:45', pnl: '+0.00' },
-        { id: 'TX-9920', bot: 'Scalper Alpha', pair: 'BTC/USDT', side: 'sell', price: '42,320.00', size: '0.25', time: '11:58:20', pnl: '+$42.50' },
-        { id: 'TX-9919', bot: 'ETH Arb', pair: 'ETH/USDT', side: 'sell', price: '2,890.50', size: '1.5', time: '11:45:10', pnl: '+$12.40' },
-        { id: 'TX-9918', bot: 'Solana Trend', pair: 'SOL/USDT', side: 'buy', price: '44.20', size: '15.0', time: '10:30:15', pnl: '-$8.50' },
-        { id: 'TX-9917', bot: 'Scalper Alpha', pair: 'BTC/USDT', side: 'buy', price: '42,050.00', size: '0.25', time: '09:12:00', pnl: '+$25.00' },
-        { id: 'TX-9916', bot: 'Scalper Alpha', pair: 'BTC/USDT', side: 'sell', price: '42,150.00', size: '0.25', time: '09:05:00', pnl: '+$25.00' },
-    ];
+// --- Types ---
+interface Bot {
+    id: string;
+    name: string;
+    status: string;
+}
+
+interface BotStats {
+    total_pnl: number;
+    win_rate: number;
+    total_trades: number;
+    profit_factor: number;
+    average_pnl: number;
+}
+
+// --- API ---
+const fetchBots = async () => {
+    const res = await axios.get<Bot[]>('http://localhost:8001/bots');
+    return res.data;
+};
+
+const fetchBotStats = async (botId: string) => {
+    const res = await axios.get<BotStats>(`http://localhost:8001/bots/${botId}/stats`);
+    return res.data;
+};
+
+// --- Components ---
+
+function BotSummaryCard({ bot, onClick }: { bot: Bot; onClick: () => void }) {
+    const { data: stats, isLoading } = useQuery({
+        queryKey: ['bot-stats', bot.id],
+        queryFn: () => fetchBotStats(bot.id)
+    });
+
+    if (isLoading) return (
+        <Card className="animate-pulse h-40">
+            <CardContent className="h-full flex items-center justify-center text-muted-foreground/20">
+                Loading...
+            </CardContent>
+        </Card>
+    );
 
     return (
-        <div className="p-6 space-y-6">
-            <h2 className="text-2xl font-bold">Bot Trade History</h2>
-
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <CardTitle>Recent Executions</CardTitle>
-                        <div className="flex gap-2">
-                            <button className="text-xs bg-secondary px-2 py-1 rounded hover:bg-secondary/80">Export CSV</button>
+        <Card className="hover:border-primary/50 cursor-pointer transition-all" onClick={onClick}>
+            <CardHeader className="pb-2">
+                <div className="flex justify-between items-start">
+                    <CardTitle className="text-lg">{bot.name}</CardTitle>
+                    <Badge variant={bot.status === 'RUNNING' ? 'success' : 'secondary'}>{bot.status}</Badge>
+                </div>
+            </CardHeader>
+            <CardContent>
+                <div className="grid grid-cols-2 gap-4 mt-2">
+                    <div>
+                        <p className="text-xs text-muted-foreground">Total PnL</p>
+                        <p className={`text-xl font-bold ${stats?.total_pnl && stats.total_pnl >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                            {stats?.total_pnl?.toFixed(2) ?? '0.00'} USDT
+                        </p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-muted-foreground">Win Rate</p>
+                        <div className="flex items-center gap-1">
+                            <TrendingUp className="w-4 h-4 text-primary" />
+                            <span className="text-lg font-bold">{((stats?.win_rate ?? 0) * 100).toFixed(1)}%</span>
                         </div>
                     </div>
-                </CardHeader>
-                <CardContent>
-                    <table className="w-full text-sm text-left">
-                        <thead className="text-xs text-muted-foreground uppercase bg-secondary/30">
-                            <tr>
-                                <th className="px-4 py-3 rounded-l-lg">Time</th>
-                                <th className="px-4 py-3">Bot</th>
-                                <th className="px-4 py-3">Pair</th>
-                                <th className="px-4 py-3">Side</th>
-                                <th className="px-4 py-3">Price</th>
-                                <th className="px-4 py-3">Size</th>
-                                <th className="px-4 py-3 rounded-r-lg text-right">Realized PnL</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {trades.map((trade) => (
-                                <tr key={trade.id} className="border-b border-border/50 hover:bg-secondary/10 transition-colors">
-                                    <td className="px-4 py-3 font-mono text-muted-foreground">{trade.time}</td>
-                                    <td className="px-4 py-3 font-medium">{trade.bot}</td>
-                                    <td className="px-4 py-3">{trade.pair}</td>
-                                    <td className="px-4 py-3">
-                                        <Badge variant={trade.side === 'buy' ? 'success' : 'destructive'} className="uppercase text-[10px]">
-                                            {trade.side}
-                                        </Badge>
-                                    </td>
-                                    <td className="px-4 py-3 font-mono">{trade.price}</td>
-                                    <td className="px-4 py-3 font-mono">{trade.size}</td>
-                                    <td className={`px-4 py-3 text-right font-medium ${trade.pnl.startsWith('+') ? 'text-emerald-500' : 'text-red-500'}`}>
-                                        {trade.pnl}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                    <div>
+                        <p className="text-xs text-muted-foreground">Trades</p>
+                        <p className="font-mono">{stats?.total_trades ?? 0}</p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-muted-foreground">PF</p>
+                        <p className="font-mono">{stats?.profit_factor === Infinity ? 'Inf' : stats?.profit_factor?.toFixed(2) ?? '0.00'}</p>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function BotDetailView({ botId, onBack }: { botId: string; onBack: () => void }) {
+    // Placeholder for Drill-Down Level 2 & 3
+    return (
+        <div className="space-y-6">
+            <button onClick={onBack} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+                <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+            </button>
+            <h2 className="text-2xl font-bold">Bot Session History: {botId}</h2>
+
+            <Card>
+                <CardContent className="p-12 text-center text-muted-foreground">
+                    <Activity className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>Detailed Session & Trade History will appear here.</p>
+                    <p className="text-xs">(To be implemented in Level 2 & 3)</p>
                 </CardContent>
             </Card>
         </div>
     );
 }
+
+// --- Main View (Drill-Down Orchestrator) ---
+export default function BotTradesView() {
+    const [selectedBotId, setSelectedBotId] = useState<string | null>(null);
+    const { data: bots, isLoading } = useQuery({
+        queryKey: ['bots'],
+        queryFn: fetchBots
+    });
+
+    if (selectedBotId) {
+        return <BotDetailView botId={selectedBotId} onBack={() => setSelectedBotId(null)} />;
+    }
+
+    return (
+        <div className="p-6 space-y-6">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+                <DollarSign className="w-6 h-6 text-primary" />
+                Performance Dashboard
+            </h2>
+
+            {isLoading ? (
+                <div className="text-center py-20">Loading Bots...</div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {bots?.map(bot => (
+                        <BotSummaryCard key={bot.id} bot={bot} onClick={() => setSelectedBotId(bot.id)} />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
