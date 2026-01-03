@@ -6,6 +6,7 @@ from bot_client import BotClient
 from ledger_adapter import LedgerAwareAdapter
 # Import strategies dynamically or statically
 from strategies.test_trading import TestTradingStrategy
+from strategies.orderflow_exhaustion_v1 import OrderflowExhaustionV1Strategy
 
 logger = logging.getLogger("execution-service.engine")
 
@@ -101,7 +102,14 @@ class BotRunner:
         """
         Factory method to load the correct strategy class based on config.
         """
-        self.strategy_instance = TestTradingStrategy(self.bot_config)
+        pipeline = self.bot_config.get("pipeline", {}) if isinstance(self.bot_config, dict) else {}
+        strategy_node = pipeline.get("strategy", {}) if isinstance(pipeline, dict) else {}
+        strategy_id = strategy_node.get("id")
+
+        if strategy_id == "orderflow_exhaustion_v1":
+            self.strategy_instance = OrderflowExhaustionV1Strategy(self.bot_config)
+        else:
+            self.strategy_instance = TestTradingStrategy(self.bot_config)
 
     async def _run_loop(self):
         """

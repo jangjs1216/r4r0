@@ -24,6 +24,12 @@ class LedgerAwareAdapter:
     async def get_ticker(self, key_id, symbol):
         return await self.adapter.get_ticker(key_id, symbol)
 
+    async def get_depth(self, key_id, symbol, limit=50):
+        return await self.adapter.get_depth(key_id, symbol, limit)
+
+    async def get_trades(self, key_id, symbol, limit=100):
+        return await self.adapter.get_trades(key_id, symbol, limit)
+
     # 트랜잭션 메서드 (매매 실행 및 기록)
     async def place_order(self, key_id, symbol, side, amount, order_type='market', price=None, reason="Strategy Signal"):
         """

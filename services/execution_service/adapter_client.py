@@ -60,3 +60,35 @@ class AdapterClient:
                  logger.error(f"Failed to place order: {e}")
                  # Return error dict or raise
                  return {"status": "error", "error": str(e)}
+
+    async def get_depth(self, key_id: str, symbol: str, limit: int = 50) -> Optional[Dict[str, Any]]:
+        """
+        어댑터를 통해 오더북(Depth)을 조회합니다.
+        """
+        async with httpx.AsyncClient() as client:
+            try:
+                resp = await client.get(
+                    f"{ADAPTER_SERVICE_URL}/market/depth",
+                    params={"key_id": key_id, "symbol": symbol, "limit": limit},
+                )
+                resp.raise_for_status()
+                return resp.json()
+            except Exception as e:
+                logger.error(f"Failed to fetch depth: {e}")
+                return None
+
+    async def get_trades(self, key_id: str, symbol: str, limit: int = 100) -> Optional[Dict[str, Any]]:
+        """
+        어댑터를 통해 최근 체결(Trades)을 조회합니다.
+        """
+        async with httpx.AsyncClient() as client:
+            try:
+                resp = await client.get(
+                    f"{ADAPTER_SERVICE_URL}/market/trades",
+                    params={"key_id": key_id, "symbol": symbol, "limit": limit},
+                )
+                resp.raise_for_status()
+                return resp.json()
+            except Exception as e:
+                logger.error(f"Failed to fetch trades: {e}")
+                return None

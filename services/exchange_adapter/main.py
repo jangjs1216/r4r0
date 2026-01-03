@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException
 import os
 import httpx
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 app = FastAPI(title="Exchange Adapter Service", version="1.0.0")
 
@@ -153,6 +153,83 @@ class OrderRequest(BaseModel):
     amount: float
     order_type: str = 'market'
     price: Optional[float] = None
+
+@app.get("/market/depth")
+async def get_depth(key_id: str, symbol: str, limit: int = 50):
+    # 1. 자격 증명 조회 (거래소 라우팅 용도)
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(f"{AUTH_SERVICE_URL}/internal/keys/{key_id}/secret")
+            if resp.status_code != 200:
+                raise HTTPException(status_code=resp.status_code, detail="Failed to retrieve key")
+            creds = resp.json()
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=str(e))
+
+    exchange_id = creds["exchange"]
+    exchange = await get_exchange_client(exchange_id, creds["publicKey"], creds["secretKey"])
+
+    try:
+        await exchange.load_markets()
+        ob = await exchange.fetch_order_book(symbol, limit=limit)
+        bids = ob.get("bids") or []
+        asks = ob.get("asks") or []
+
+        best_bid = float(bids[0][0]) if bids else None
+        best_ask = float(asks[0][0]) if asks else None
+
+        return {
+            "symbol": symbol,
+            "timestamp": ob.get("timestamp"),
+            "best_bid": best_bid,
+            "best_ask": best_ask,
+            "bids": bids,
+            "asks": asks,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        await exchange.close()
+
+
+@app.get("/market/trades")
+async def get_trades(key_id: str, symbol: str, limit: int = 100) -> Dict[str, Any]:
+    # 1. 자격 증명 조회 (거래소 라우팅 용도)
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(f"{AUTH_SERVICE_URL}/internal/keys/{key_id}/secret")
+            if resp.status_code != 200:
+                raise HTTPException(status_code=resp.status_code, detail="Failed to retrieve key")
+            creds = resp.json()
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=str(e))
+
+    exchange_id = creds["exchange"]
+    exchange = await get_exchange_client(exchange_id, creds["publicKey"], creds["secretKey"])
+
+    try:
+        await exchange.load_markets()
+        trades = await exchange.fetch_trades(symbol, limit=limit)
+
+        normalized = []
+        for t in trades or []:
+            side = t.get("side")
+            if side is not None:
+                side = side.lower()
+            normalized.append(
+                {
+                    "timestamp": t.get("timestamp"),
+                    "price": t.get("price"),
+                    "amount": t.get("amount"),
+                    "side": side,
+                }
+            )
+
+        return {"symbol": symbol, "trades": normalized}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        await exchange.close()
 
 @app.get("/market/ticker")
 async def get_ticker(key_id: str, symbol: str):    # 거래소 컨텍스트를 파악하기 위해 key_id 필요

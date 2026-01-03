@@ -21,11 +21,11 @@
 
 ### 2.1 제공 API (`contracts/backend/exchange-adapter-api.yaml`)
 
-- **GET /balance/{keyId}**
-  - 입력: `keyId` (AuthService에 등록된 키 ID)
+- **GET /balance/{key_id}**
+  - 입력: `key_id` (AuthService에 등록된 키 ID)
   - 출력: `AccountBalance` (총 자산 가치 및 코인별 보유량)
   - 동작:
-    1. `AuthService`에 `keyId`에 해당하는 Secret 요청.
+    1. `AuthService`에 `key_id`에 해당하는 Secret 요청.
     2. Binance API (`GET /api/v3/account`) 호출.
     3. 결과를 표준 포맷으로 변환하여 반환.
 
@@ -33,6 +33,16 @@
   - 입력: `key_id`, `symbol` (예: BTC/USDT)
   - 출력: 현재가(`price`) 및 주문 제약 정보(`limits`: min_notional, min_amount)
   - 목적: 전략 실행 전 최소 주문 금액 준수 여부 확인용
+
+- **GET /market/depth**
+  - 입력: `key_id`, `symbol`, `limit`
+  - 출력: `best_bid`, `best_ask`, `bids`, `asks`
+  - 목적: 오더북 스프레드/미드/스윕(레벨 소진) 근사 계산용
+
+- **GET /market/trades**
+  - 입력: `key_id`, `symbol`, `limit`
+  - 출력: 최근 체결 리스트(`timestamp`, `price`, `amount`, `side`)
+  - 목적: 체결 불균형(탐욕/공포성 테이커 흐름) 근사 계산용
 
 - **POST /order**
   - 입력: `key_id`, `symbol`, `side` (buy/sell), `amount`, `order_type`, `price` (limit인 경우)

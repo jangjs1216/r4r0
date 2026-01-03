@@ -54,6 +54,31 @@
       },
       "required": ["allocation_ratio", "hold_duration"]
     }
+  },
+  {
+    "id": "orderflow_exhaustion_v1",
+    "name": "Orderflow Exhaustion Fade",
+    "description": "Contrarian fade after taker-flow spike (fear/greed) with absorption confirmation.",
+    "version": "1.0.0",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "depth_limit": { "type": "integer", "default": 50 },
+        "trades_limit": { "type": "integer", "default": 200 },
+        "trades_lookback_sec": { "type": "integer", "default": 10 },
+        "delta_ratio_threshold": { "type": "number", "default": 2.5 },
+        "min_total_quote_volume": { "type": "number", "default": 50.0 },
+        "spread_expand_ratio_threshold": { "type": "number", "default": 1.5 },
+        "sweep_move_pct_threshold": { "type": "number", "default": 0.001 },
+        "confirm_absorption_ticks": { "type": "integer", "default": 2 },
+        "buy_allocation_ratio": { "type": "number", "default": 0.1 },
+        "sell_allocation_ratio": { "type": "number", "default": 0.1 },
+        "take_profit_pct": { "type": "number", "default": 0.003 },
+        "stop_loss_pct": { "type": "number", "default": 0.004 },
+        "time_stop_sec": { "type": "integer", "default": 180 },
+        "cooldown_sec": { "type": "integer", "default": 120 }
+      }
+    }
   }
 ]
 ```
