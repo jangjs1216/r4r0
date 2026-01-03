@@ -5,7 +5,7 @@ from datetime import datetime
 import uuid
 import json
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 import os
 
@@ -34,12 +34,41 @@ class Bot(Base):
         return json.loads(self.config_json) if self.config_json else {}
 
     orders = relationship("LocalOrder", back_populates="bot", cascade="all, delete-orphan")
+    sessions = relationship("BotSession", back_populates="bot", cascade="all, delete-orphan")
+
+class BotSession(Base):
+    """
+    봇의 실행 주기(세션)를 관리하는 모델.
+    Start ~ Stop 사이의 기간을 하나의 세션으로 정의하며, PnL 집계의 기준이 됨.
+    """
+    __tablename__ = "bot_sessions"
+
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
+    bot_id = Column(String, ForeignKey("bots.id"), index=True)
+    start_time = Column(DateTime, default=datetime.utcnow, nullable=False)
+    end_time = Column(DateTime, nullable=True) # 실행 중일 땐 Null
+    status = Column(String, default="ACTIVE") # ACTIVE, ENDED, CRASHED
+    
+    # 세션 요약 정보 (JSON 캐싱) - 실시간 계산 부하를 줄이기 위함
+    # 예: {"total_pnl": 10.5, "win_rate": 0.6, "total_trades": 5}
+    summary_json = Column(Text, default="{}")
+
+    bot = relationship("Bot", back_populates="sessions")
+    orders = relationship("LocalOrder", back_populates="session")
+
+    def set_summary(self, summary_dict):
+        self.summary_json = json.dumps(summary_dict)
+
+    def get_summary(self):
+        return json.loads(self.summary_json) if self.summary_json else {}
 
 class LocalOrder(Base):
     __tablename__ = "local_orders"
 
     id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
     bot_id = Column(String, ForeignKey("bots.id"), index=True)
+    session_id = Column(String, ForeignKey("bot_sessions.id"), index=True, nullable=True) # 초기엔 Nullable (Migration용)
+    
     symbol = Column(String)
     side = Column(String)     # BUY, SELL
     quantity = Column(Float)
@@ -48,7 +77,16 @@ class LocalOrder(Base):
     reason = Column(String, nullable=True) # 주문 사유 (예: "RSI < 30")
 
     bot = relationship("Bot", back_populates="orders")
+    session = relationship("BotSession", back_populates="orders")
     executions = relationship("GlobalExecution", back_populates="local_order")
+
+    @property
+    def realized_pnl(self):
+        return sum(e.realized_pnl for e in self.executions)
+    
+    @property
+    def fee(self):
+        return sum(e.fee for e in self.executions)
 
 class GlobalExecution(Base):
     __tablename__ = "global_executions"
@@ -104,10 +142,40 @@ class LocalOrderCreate(BaseModel):
     quantity: float
     reason: Optional[str] = None
     timestamp: Optional[datetime] = None
+    session_id: Optional[str] = None
 
 class LocalOrderResponse(BaseModel):
     id: str
+    bot_id: str
+    session_id: Optional[str] = None
+    symbol: str
+    side: str
+    quantity: float
+    timestamp: datetime
     status: str
+    reason: Optional[str] = None
+    realized_pnl: Optional[float] = 0.0
+    fee: Optional[float] = 0.0
+
+    class Config:
+        from_attributes = True
+
+class BotSessionResponse(BaseModel):
+    id: str
+    bot_id: str
+    start_time: datetime
+    end_time: Optional[datetime] = None
+    status: str
+    summary: Dict[str, Any] = {}
+
+    class Config:
+        from_attributes = True
+
+class BotSessionDetailResponse(BotSessionResponse):
+    orders: List[LocalOrderResponse] = []
+
+    class Config:
+        from_attributes = True
 
 class OrderStatusUpdate(BaseModel):
     status: str

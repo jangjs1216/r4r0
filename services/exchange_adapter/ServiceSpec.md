@@ -10,7 +10,8 @@
 - **책임 (Responsibility)**:
   - `AuthService`로부터 (내부 채널을 통해) 복호화된 API Key/Secret을 획득하여 서명 생성.
   - 잔고(Balance) 조회 요청 수행 및 결과 반환.
-  - (추후) 주문(Order) 실행 및 취소.
+  - **Current Price & Limits**: 실시간 현재가 및 주문 제약조건(Min Notional 등) 조회.
+  - **Order Execution**: 봇 또는 사용자의 요청에 따라 실제 매수/매도 주문 실행.
 
 - **하지 않는 일 (Non-Goals)**:
   - **Key Storage**: 키를 직접 저장하지 않으며, `AuthService`에 의존한다.
@@ -24,9 +25,19 @@
   - 입력: `keyId` (AuthService에 등록된 키 ID)
   - 출력: `AccountBalance` (총 자산 가치 및 코인별 보유량)
   - 동작:
-    1. `AuthService`에 `keyId`에 해당하는 Secret 요청 (Internal gRPC/HTTP).
+    1. `AuthService`에 `keyId`에 해당하는 Secret 요청.
     2. Binance API (`GET /api/v3/account`) 호출.
     3. 결과를 표준 포맷으로 변환하여 반환.
+
+- **GET /market/ticker**
+  - 입력: `key_id`, `symbol` (예: BTC/USDT)
+  - 출력: 현재가(`price`) 및 주문 제약 정보(`limits`: min_notional, min_amount)
+  - 목적: 전략 실행 전 최소 주문 금액 준수 여부 확인용
+
+- **POST /order**
+  - 입력: `key_id`, `symbol`, `side` (buy/sell), `amount`, `order_type`, `price` (limit인 경우)
+  - 출력: `order_id` (거래소 주문 ID), `status`, `details`
+  - 동작: `AuthService`에서 키를 받아 거래소에 주문을 전송하고 결과를 반환.
 
 ### 2.2 의존 계약 (Dependencies)
 

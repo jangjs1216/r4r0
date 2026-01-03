@@ -6,8 +6,12 @@ from models import (
     Base, engine, SessionLocal, 
     Bot, BotCreate, BotUpdate, BotResponse, bot_to_pydantic,
     LocalOrder, LocalOrderCreate, LocalOrderResponse, OrderStatusUpdate,
-    GlobalExecution, GlobalExecutionCreate, BotStatsResponse
+    GlobalExecution, GlobalExecutionCreate, BotStatsResponse,
+    BotSession, BotSessionResponse, BotSessionDetailResponse
 )
+from datetime import datetime
+import json
+import uuid
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="BotService", version="1.0.0")
@@ -81,23 +85,127 @@ def update_bot(bot_id: str, bot_in: BotUpdate, db: Session = Depends(get_db)):
     db.refresh(db_bot)
     return bot_to_pydantic(db_bot)
 
-@app.delete("/bots/{bot_id}")
-def delete_bot(bot_id: str, db: Session = Depends(get_db)):
-    db_bot = db.query(Bot).filter(Bot.id == bot_id).first()
-    if db_bot is None:
-        raise HTTPException(status_code=404, detail="Bot not found")
-    
     db.delete(db_bot)
     db.commit()
     return {"ok": True}
+
+# --- Session APIs ---
+
+@app.post("/bots/{bot_id}/start", response_model=BotSessionResponse)
+def start_bot_session(bot_id: str, db: Session = Depends(get_db)):
+    db_bot = db.query(Bot).filter(Bot.id == bot_id).first()
+    if not db_bot:
+        raise HTTPException(status_code=404, detail="Bot not found")
+
+    # 1. Close existing active session if any
+    active_session = db.query(BotSession).filter(
+        BotSession.bot_id == bot_id, 
+        BotSession.status == "ACTIVE"
+    ).first()
+    
+    if active_session:
+        print(f"[Session] Closing stale active session {active_session.id} for bot {bot_id}")
+        active_session.end_time = datetime.utcnow()
+        active_session.status = "ENDED"
+    
+    # 2. Create new session
+    new_session = BotSession(
+        bot_id=bot_id,
+        status="ACTIVE",
+        start_time=datetime.utcnow()
+    )
+    db.add(new_session)
+    
+    # 3. Update Bot Status
+    db_bot.status = "RUNNING"
+    
+    db.commit()
+    db.refresh(new_session)
+    db.refresh(db_bot)
+    
+    return new_session
+
+@app.post("/bots/{bot_id}/stop", response_model=BotSessionResponse)
+def stop_bot_session(bot_id: str, db: Session = Depends(get_db)):
+    db_bot = db.query(Bot).filter(Bot.id == bot_id).first()
+    if not db_bot:
+        raise HTTPException(status_code=404, detail="Bot not found")
+
+    # 1. Find Active Session
+    active_session = db.query(BotSession).filter(
+        BotSession.bot_id == bot_id, 
+        BotSession.status == "ACTIVE"
+    ).first()
+    
+    if active_session:
+        active_session.end_time = datetime.utcnow()
+        active_session.status = "ENDED"
+    else:
+        # No active session found to stop, create a dummy ended one or just return error?
+        # We'll just return a dummy response or raise error. 
+        # But to be safe let's check if we recently stopped it.
+        # Just return the latest session if possible or raise 404
+        pass
+
+    # 2. Update Bot Status
+    db_bot.status = "STOPPED"
+    
+    db.commit()
+    if active_session:
+        db.refresh(active_session)
+        return active_session
+    else:
+        # Fallback if no active session was found (e.g. force stopped)
+        raise HTTPException(status_code=400, detail="No active session found to stop")
+
+@app.get("/bots/{bot_id}/sessions", response_model=List[BotSessionResponse])
+def get_bot_sessions(bot_id: str, db: Session = Depends(get_db)):
+    sessions = db.query(BotSession).filter(BotSession.bot_id == bot_id).order_by(BotSession.start_time.desc()).all()
+    # Add summary dict to response
+    results = []
+    for s in sessions:
+        resp = BotSessionResponse.from_orm(s)
+        resp.summary = s.get_summary()
+        results.append(resp)
+    return results
+
+@app.get("/sessions/{session_id}", response_model=BotSessionDetailResponse)
+def get_session_detail(session_id: str, db: Session = Depends(get_db)):
+    s = db.query(BotSession).filter(BotSession.id == session_id).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Session not found")
+    resp = BotSessionDetailResponse.from_orm(s)
+    resp.summary = s.get_summary()
+    return resp
 
 # --- Ledger APIs ---
 
 @app.post("/orders", response_model=LocalOrderResponse)
 def create_local_order(order_in: LocalOrderCreate, db: Session = Depends(get_db)):
     print(f"[BotService] Received Local Order: {order_in.symbol} {order_in.side} ({order_in.reason})")
+    
+    # Session Linking Logic
+    session_id = order_in.session_id
+    if not session_id:
+        # Auto-detect active session
+        active_session = db.query(BotSession).filter(
+            BotSession.bot_id == order_in.bot_id,
+            BotSession.status == "ACTIVE"
+        ).order_by(BotSession.start_time.desc()).first()
+        
+        if active_session:
+            session_id = active_session.id
+        else:
+            print(f"[WARN] No active session found for bot {order_in.bot_id}. Creating emergency session.")
+            emerg_session = BotSession(bot_id=order_in.bot_id, status="ACTIVE", start_time=datetime.utcnow())
+            db.add(emerg_session)
+            db.commit() # Need ID
+            db.refresh(emerg_session)
+            session_id = emerg_session.id
+
     db_order = LocalOrder(
         bot_id=order_in.bot_id,
+        session_id=session_id,
         symbol=order_in.symbol,
         side=order_in.side,
         quantity=order_in.quantity,
@@ -107,7 +215,7 @@ def create_local_order(order_in: LocalOrderCreate, db: Session = Depends(get_db)
     db.add(db_order)
     db.commit()
     db.refresh(db_order)
-    return LocalOrderResponse(id=db_order.id, status=db_order.status)
+    return LocalOrderResponse.from_orm(db_order)
 
 @app.put("/orders/{order_id}/status", response_model=LocalOrderResponse)
 def update_order_status(order_id: str, status_update: OrderStatusUpdate, db: Session = Depends(get_db)):
@@ -118,7 +226,8 @@ def update_order_status(order_id: str, status_update: OrderStatusUpdate, db: Ses
     
     db_order.status = status_update.status
     db.commit()
-    return LocalOrderResponse(id=db_order.id, status=db_order.status)
+    db.refresh(db_order)
+    return LocalOrderResponse.from_orm(db_order)
 
 def match_fifo_orders(db: Session, sell_exec: GlobalExecution, bot_id: str):
     """
@@ -212,6 +321,44 @@ def record_execution(exec_in: GlobalExecutionCreate, db: Session = Depends(get_d
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=f"Failed to record execution: {str(e)}")
         
+    # Update Session PnL & Fee
+    # Fee is always accumulated regardless of PnL
+    if db_order.session_id:
+        session = db.query(BotSession).filter(BotSession.id == db_order.session_id).first()
+        if session:
+            summary = session.get_summary()
+            
+            # Update Stats (PnL, WinRate, TradeCount)
+            # PnL logic implies a closed trade (SELL side mostly)
+            if db_exec.realized_pnl != 0:
+                current_pnl = summary.get("total_pnl", 0.0)
+                summary["total_pnl"] = current_pnl + db_exec.realized_pnl
+                
+                # Update Trade Count & Win Count
+                current_trades = summary.get("trade_count", 0) + 1
+                summary["trade_count"] = current_trades
+                
+                current_wins = summary.get("win_count", 0)
+                if db_exec.realized_pnl > 0:
+                    current_wins += 1
+                    summary["win_count"] = current_wins
+                
+                # Recalculate Win Rate
+                if current_trades > 0:
+                    summary["win_rate"] = current_wins / current_trades
+                else:
+                    summary["win_rate"] = 0.0
+
+            # Update Fee (Always)
+            if db_exec.fee > 0:
+                current_fee = summary.get("total_fee", 0.0)
+                summary["total_fee"] = current_fee + db_exec.fee
+            
+            session.set_summary(summary)
+            db.add(session)
+            db.commit()
+            print(f"[Session] Updated Session {session.id}: PnL={summary.get('total_pnl', 0):.4f}, WinRate={summary.get('win_rate', 0):.2f}, Fee={summary.get('total_fee', 0):.4f}")
+    
     return {"ok": True, "realized_pnl": db_exec.realized_pnl}
 
 @app.get("/bots/{bot_id}/stats", response_model=BotStatsResponse)

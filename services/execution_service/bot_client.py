@@ -60,6 +60,21 @@ class BotClient:
                 logger.error(f"봇 상태 업데이트 실패 ({bot_id} -> {status}): {e}")
                 return None
 
+    async def stop_bot_session(self, bot_id: str):
+        """
+        [BotService] 봇의 세션을 명시적으로 종료합니다. (POST /bots/{id}/stop)
+        이 호출은 Session 상태를 'ENDED'로 변경하고 Bot 상태를 'STOPPED'로 변경합니다.
+        SSOT인 BotService의 상태를 업데이트하는 가장 확실한 방법입니다.
+        """
+        async with httpx.AsyncClient() as client:
+            try:
+                resp = await client.post(f"{BOT_SERVICE_URL}/bots/{bot_id}/stop")
+                resp.raise_for_status()
+                return resp.json()
+            except Exception as e:
+                logger.error(f"세션 종료 요청 실패 ({bot_id}): {e}")
+                return None
+
     async def create_local_order(self, bot_id, symbol, side, quantity, reason, timestamp):
         async with httpx.AsyncClient() as client:
             try:

@@ -31,15 +31,23 @@
 - **DELETE /keys/{id}**
   - 키 영구 삭제.
 
+### 2.2 Internal API (Microservice Only)
+
+- **GET /internal/keys/{id}/secret**
+  - 외부 노출 금지 (Private Network Only).
+  - 다른 서비스(ExchangeAdapter 등)가 서명을 위해 요청.
+  - 응답: `exchange`, `publicKey`, `secretKey` (Decrypted).
+
 ## 3. 내부 개념 모델 (Domain Model)
 
 - **StoredCredential**:
   - `id` (UUID)
   - `exchange` (enum)
   - `label` (string)
-  - `access_key_enc` (encrypted bytes)
-  - `secret_key_enc` (encrypted bytes)
+  - `public_key` (string): 평문 저장 (식별 용도, 응답시엔 마스킹)
+  - `secret_key_enc` (encrypted bytes): 암호화 저장
   - `created_at`
+  - `status`: active / inactive
 
 ## 4. 주요 플로우 요약
 
