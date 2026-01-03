@@ -90,9 +90,10 @@ class BotRunner:
                 logger.warning("종료 대기 중 타임아웃 또는 취소 발생. 강제 종료합니다.")
                 self.task.cancel()
         
-        # 4. 최종적으로 STOPPED 상태로 전이
-        logger.info(f"{self.bot_config['name']} 상태를 STOPPED로 변경합니다.")
-        await self.bot_client.update_bot_status(self.bot_config['id'], "STOPPED")
+        # 4. 최종적으로 세션 종료 및 STOPPED 상태 전이
+        # update_bot_status 대신 stop_bot_session을 호출하여 세션까지 정리합니다.
+        logger.info(f"{self.bot_config['name']}의 세션을 종료하고 상태를 STOPPED로 변경합니다.")
+        await self.bot_client.stop_bot_session(self.bot_config['id'])
         
         logger.info(f"{self.bot_config['name']}의 BotRunner가 정지되었습니다.")
 

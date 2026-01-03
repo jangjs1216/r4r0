@@ -174,32 +174,86 @@ class TestTradingStrategy:
         """
         Called when the bot is requested to stop.
         Clean up resources or close positions.
+        Ensures NO position is left behind (Zero Position Policy).
         """
         logger.info(f"[{self.config['name']}] Stopping... Checking for open positions.")
-        
         adapter = context["adapter"]
         
-        # If holding a position, liquidate it
-        if self.state == "HOLDING" and self.bought_amount > 0:
-            logger.warning(f"[{self.config['name']}] Forced Liquidation: Selling {self.bought_amount} {self.symbol}...")
+        # 1. Check ACTUAL Balance from Exchange (Source of Truth)
+        # Don't rely solely on self.bought_amount
+        try:
+            # Parse Base Asset from Symbol (e.g., BTC/USDT -> BTC)
+            base_asset = self.symbol.split('/')[0]
+            balance_data = await adapter.get_balance(self.key_id)
+            actual_qty = 0.0
+            
+            for asset in balance_data.get("assets", []):
+                if asset["asset"] == base_asset:
+                    actual_qty = float(asset["free"])
+                    break
+            
+            logger.info(f"[{self.config['name']}] Actual {base_asset} Balance: {actual_qty}")
+            
+            # Threshold for dust (very small amount)
+            if actual_qty <= 0.00001:
+                logger.info("Balance is near zero. No need to liquidate.")
+                self.state = "FINISHED"
+                return
+            
+            # CRITICAL SAFETY CHECK:
+            # We must NOT sell more than what the bot tracked it bought.
+            # If the user has other holdings (e.g. HODL BTC), we shouldn't touch them.
+            # However, if fees reduced our balance below bought_amount, we must limit to actual_qty to avoid 'Insufficient Balance'.
+            
+            if self.bought_amount <= 0:
+                logger.info("Internal state says we hold nothing. Skipping liquidation to be safe.")
+                self.state = "FINISHED"
+                return
+
+            sell_qty = min(actual_qty, self.bought_amount)
+            logger.info(f"Liquidation Quantity Calculated: {sell_qty} (Actual: {actual_qty}, Tracked: {self.bought_amount})")
+
+        except Exception as e:
+            logger.error(f"Failed to check balance during stop: {e}")
+            # Fallback to internal tracking if balance check fails
+            sell_qty = self.bought_amount
+
+        # 2. Liquidation Loop with Retry
+        retry_count = 0
+        max_retries = 5
+        
+        while sell_qty > 0.00001 and retry_count < max_retries:
+            logger.warning(f"[{self.config['name']}] Forced Liquidation (Attempt {retry_count+1}/{max_retries}): Selling {sell_qty} {self.symbol}...")
             
             try:
                 order = await adapter.place_order(
                     key_id=self.key_id,
                     symbol=self.symbol,
                     side="sell",
-                    amount=self.bought_amount,
+                    amount=sell_qty,
                     reason="Forced Stop Liquidation"
                 )
                 
                 if order.get("status") == "filled":
                     logger.info("Liquidation Filled! Cleanup complete.")
-                    self.state = "FINISHED" # Or STOPPED
+                    self.state = "FINISHED"
+                    return
                 else:
-                    logger.error(f"Liquidation failed: {order}")
+                    logger.error(f"Liquidation failed (Status: {order.get('status')}). Retrying...")
                     
             except Exception as e:
-                logger.error(f"Error during liquidation: {e}")
-        else:
-            logger.info("No open positions to close.")
+                logger.error(f"Error during liquidation attempt: {e}")
+            
+            retry_count += 1
+            await asyncio.sleep(2) # Wait before retry
+            
+            # Re-check balance update if possible (Optional, but safe)
+            # For simplicity, we assume failure means we still have the position or partial fill.
+            # In a real scenario, we might want to fetch balance again here.
+
+        if retry_count >= max_retries:
+            logger.error(f"CRITICAL: Failed to liquidate position after {max_retries} attempts.")
+            # At this point, we have to stop anyway, but we log a critical error.
+            # The user might need to intervene manually.
+            self.state = "FINISHED"
 

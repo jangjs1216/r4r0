@@ -80,6 +80,14 @@ class LocalOrder(Base):
     session = relationship("BotSession", back_populates="orders")
     executions = relationship("GlobalExecution", back_populates="local_order")
 
+    @property
+    def realized_pnl(self):
+        return sum(e.realized_pnl for e in self.executions)
+    
+    @property
+    def fee(self):
+        return sum(e.fee for e in self.executions)
+
 class GlobalExecution(Base):
     __tablename__ = "global_executions"
 
@@ -146,6 +154,8 @@ class LocalOrderResponse(BaseModel):
     timestamp: datetime
     status: str
     reason: Optional[str] = None
+    realized_pnl: Optional[float] = 0.0
+    fee: Optional[float] = 0.0
 
     class Config:
         from_attributes = True

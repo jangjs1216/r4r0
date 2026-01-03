@@ -321,19 +321,43 @@ def record_execution(exec_in: GlobalExecutionCreate, db: Session = Depends(get_d
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=f"Failed to record execution: {str(e)}")
         
-    # Update Session PnL if realized_pnl > 0 or < 0
-    if db_exec.realized_pnl != 0:
-        # Find session
-        if db_order.session_id:
-            session = db.query(BotSession).filter(BotSession.id == db_order.session_id).first()
-            if session:
-                summary = session.get_summary()
+    # Update Session PnL & Fee
+    # Fee is always accumulated regardless of PnL
+    if db_order.session_id:
+        session = db.query(BotSession).filter(BotSession.id == db_order.session_id).first()
+        if session:
+            summary = session.get_summary()
+            
+            # Update Stats (PnL, WinRate, TradeCount)
+            # PnL logic implies a closed trade (SELL side mostly)
+            if db_exec.realized_pnl != 0:
                 current_pnl = summary.get("total_pnl", 0.0)
                 summary["total_pnl"] = current_pnl + db_exec.realized_pnl
-                session.set_summary(summary)
-                db.add(session)
-                db.commit()
-                print(f"[Session] Updated PnL for Session {session.id}: {summary['total_pnl']}")
+                
+                # Update Trade Count & Win Count
+                current_trades = summary.get("trade_count", 0) + 1
+                summary["trade_count"] = current_trades
+                
+                current_wins = summary.get("win_count", 0)
+                if db_exec.realized_pnl > 0:
+                    current_wins += 1
+                    summary["win_count"] = current_wins
+                
+                # Recalculate Win Rate
+                if current_trades > 0:
+                    summary["win_rate"] = current_wins / current_trades
+                else:
+                    summary["win_rate"] = 0.0
+
+            # Update Fee (Always)
+            if db_exec.fee > 0:
+                current_fee = summary.get("total_fee", 0.0)
+                summary["total_fee"] = current_fee + db_exec.fee
+            
+            session.set_summary(summary)
+            db.add(session)
+            db.commit()
+            print(f"[Session] Updated Session {session.id}: PnL={summary.get('total_pnl', 0):.4f}, WinRate={summary.get('win_rate', 0):.2f}, Fee={summary.get('total_fee', 0):.4f}")
     
     return {"ok": True, "realized_pnl": db_exec.realized_pnl}
 

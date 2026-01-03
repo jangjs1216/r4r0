@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { Card, CardHeader, CardTitle, CardContent } from '../../shared/components/Card';
 import { Badge } from '../../shared/components/Badge';
-import { Layout, Sidebar, Search, Activity, TrendingUp, DollarSign, Clock, Calendar } from 'lucide-react';
+import { Layout, Sidebar, Search, Activity, TrendingUp, DollarSign, Clock, Calendar, Zap, Info } from 'lucide-react';
 import { format } from 'date-fns';
 
 // --- Types & API ---
@@ -14,12 +14,48 @@ interface BotStats {
 interface LocalOrderResponse {
     id: string; status: string; session_id?: string;
     symbol: string; side: string; quantity: number; reason?: string; timestamp: string;
+    realized_pnl?: number; fee?: number;
 }
 interface BotSession {
     id: string; bot_id: string; start_time: string; end_time?: string; status: string;
-    summary: { total_pnl?: number; win_rate?: number; trade_count?: number;[key: string]: any };
+    summary: { total_pnl?: number; win_rate?: number; trade_count?: number; total_fee?: number;[key: string]: any };
     // populated by detail API if needed, or we fetch orders separately
     orders?: LocalOrderResponse[];
+}
+
+// 
+// --- Timezone Helper (KST) ---
+const formatKST = (isoString?: string) => {
+    if (!isoString) return '-';
+    // Create Date object (browsers handle ISO 8601 automatically in UTC if Z is present)
+    const date = new Date(isoString);
+
+    // Format to parts in 'Asia/Seoul'
+    const formatter = new Intl.DateTimeFormat('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+
+    return formatter.format(date).replace(/\./g, '-').replace(/ /g, '');
+};
+
+const formatTimeKST = (isoString?: string) => {
+    if (!isoString) return '-';
+    // Format only time parts in 'Asia/Seoul'
+    const formatter = new Intl.DateTimeFormat('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+    return formatter.format(new Date(isoString));
 }
 
 const fetchBots = async () => (await axios.get<Bot[]>('http://localhost:8001/bots')).data;
@@ -60,7 +96,7 @@ function SessionCard({ session, isSelected, onClick }: { session: BotSession, is
                 <div className="flex flex-col">
                     <span className="text-xs text-muted-foreground flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
-                        {format(new Date(session.start_time), 'MM/dd HH:mm')}
+                        {formatKST(session.start_time).slice(5, 16)}
                     </span>
                     <Badge variant={session.status === 'ACTIVE' ? 'success' : 'secondary'} className="mt-1 w-fit text-[10px]">
                         {session.status}
@@ -93,17 +129,25 @@ function TradeTable({ orders }: { orders: LocalOrderResponse[] }) {
                         <th className="p-2 text-left">Side</th>
                         <th className="p-2 text-right">Qty</th>
                         <th className="p-2 text-left">Reason</th>
+                        <th className="p-2 text-right">Fee</th>
+                        <th className="p-2 text-right">PnL</th>
                         <th className="p-2 text-left">Status</th>
                     </tr>
                 </thead>
                 <tbody>
                     {orders.map(order => (
                         <tr key={order.id} className="border-b border-border/50 hover:bg-secondary/10">
-                            <td className="p-2 font-mono text-muted-foreground">{format(new Date(order.timestamp), 'HH:mm:ss')}</td>
+                            <td className="p-2 font-mono text-slate-400 text-xs">{formatKST(order.timestamp).split(' ')[3] || formatKST(order.timestamp).slice(11)}</td>
                             <td className="p-2 font-medium">{order.symbol}</td>
                             <td className={`p-2 font-bold ${order.side === 'BUY' ? 'text-emerald-500' : 'text-red-500'}`}>{order.side}</td>
                             <td className="p-2 text-right font-mono">{order.quantity}</td>
                             <td className="p-2 text-muted-foreground truncate max-w-[150px]">{order.reason}</td>
+                            <td className="p-2 text-right font-mono text-xs text-muted-foreground">
+                                {order.fee ? `$${order.fee.toFixed(4)}` : '-'}
+                            </td>
+                            <td className={`p-2 text-right font-mono font-bold ${(order.realized_pnl || 0) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                                {order.side === 'SELL' ? `$${(order.realized_pnl || 0).toFixed(4)}` : '-'}
+                            </td>
                             <td className="p-2"><Badge variant="outline">{order.status}</Badge></td>
                         </tr>
                     ))}
@@ -191,15 +235,21 @@ export default function BotTradesView() {
                         <CardContent className="p-4 flex justify-between items-center">
                             <div>
                                 <h3 className="font-bold text-lg flex items-center gap-2">Session Detail <Badge>{sessionDetail.status}</Badge></h3>
-                                <div className="text-xs text-muted-foreground mt-1">
-                                    Started: {format(new Date(sessionDetail.start_time), 'yyyy-MM-dd HH:mm:ss')}
+                                <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
+                                    <Clock className="w-3 h-3" /> {formatKST(sessionDetail.start_time)} (KST)
                                 </div>
                             </div>
                             <div className="flex gap-6 text-right">
                                 <div>
                                     <p className="text-xs text-muted-foreground uppercase">Total PnL</p>
                                     <p className={`text-xl font-bold ${sessionDetail.summary.total_pnl && sessionDetail.summary.total_pnl >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                                        ${sessionDetail.summary.total_pnl?.toFixed(2) || '0.00'}
+                                        ${sessionDetail.summary.total_pnl?.toFixed(4) || '0.0000'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-muted-foreground uppercase">Fees</p>
+                                    <p className="text-xl font-bold text-muted-foreground">
+                                        ${sessionDetail.summary.total_fee?.toFixed(4) || '0.0000'}
                                     </p>
                                 </div>
                                 <div>
