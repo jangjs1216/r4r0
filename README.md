@@ -12,7 +12,7 @@
 - **PortfolioViewService**: 상세 자산 배분(Allocation) 및 포지션 분석.
 - **BotConfigViewService**: 봇 인스턴스 목록 관리, Start/Stop 제어, 성과 요약 카드.
 - **BotEditorViewService**: **(New)** 봇 상세 설정, 전략 선택 및 전략별 동적 파라미터(Dynamic Params) 편집.
-- **BotTradesViewService**: 봇 실행 이력 및 성과(PnL, Latency) 통계.
+- **BotTradesViewService**: 봇 실행 세션(Session)별 성과(PnL, 승률) 및 상세 매매 이력 조회 (Master-Detail View).
 - `AuthViewService`: API 키 관리 UI (Key Management Only)** 로그인 과정 없이 바로 접근. Binance, Upbit 등 다중 거래소 API Key의 등록/삭제/권한 관리 담당. 봇이 사용할 '지갑/연결'을 관리하는 곳.
 
 ### 2. Orchestrators
@@ -25,7 +25,8 @@
 ### 3. Backend Domain Services  
   - `AuthService`: **(Key Vault)** API Key의 안전한 암호화 저장소. 코드나 Config 파일이 아닌 로컬 DB(`data/*.db`)에 암호화해 저장하며, 다른 서비스에 서명 기능을 제공하거나 제한적으로 키를 불출함.
   - `ExchangeAdapterService`: 거래소(Binance 등) API 통신 전담. `AuthService`에서 키를 받아 잔고 조회, 주문 실행 등을 수행하며 Rate Limit을 관리함.
-  - `BotService`: 봇 인스턴스의 설정(Config), 상태(Status), 생명주기(Lifecycle)를 관리하는 CRUD 서비스. 파이프라인(Pipeline) 구조의 설정을 저장.
+  - **BotService**: 봇 인스턴스의 설정(Config), 상태(Status), 생명주기(Lifecycle) 및 **세션(Session)**을 관리하는 CRUD 서비스.
+       - **Session Management**: Start/Stop 사이의 실행 주기를 기록하고, 세션별 성과(PnL)를 집계.
   - `TradingStrategyViewService`: 사용 가능한 전략(Template) 목록과 각 전략의 파라미터 스키마(JSON Schema)를 제공하는 메타데이터 서비스.
   - `ExecutionService`: **(Core Engine)** 'RUNNING' 상태인 봇을 감지하여 실제 매매 루프(Loop)를 실행하는 워커 서비스.
     - **BotRunner**: 개별 봇의 격리된 실행 환경.

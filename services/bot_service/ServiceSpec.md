@@ -147,24 +147,29 @@ Response: `{"id": "local_order_uuid"}`
 }
 ```
 
-**POST /executions** (체결 기록)
-```json
-{
-  "local_order_id": "local_order_uuid",
-  "exchange_trade_id": "123456",
-  "exchange_order_id": "987654",
-  "order_list_id": "-1",
-  "symbol": "BTC/USDT",
-  "side": "BUY",
-  "price": 50000.0,
-  "quantity": 0.1,
-  "quote_qty": 5000.0,
-  "fee": 0.001,
-  "fee_asset": "BNB",
-  "timestamp": "2025-..."
-}
-```
-Response: `{"ok": true, "realized_pnl": 0.0}`
+### 6.3 Session API (New)
+
+**POST /bots/{id}/start**
+- 봇 상태를 `RUNNING`으로 변경하고, 새로운 `active` 세션을 생성.
+
+**POST /bots/{id}/stop**
+- 봇 상태를 `STOPPED`로 변경하고, 현재 세션을 종료.
+
+**GET /bots/{id}/sessions**
+- 해당 봇의 모든 세션 목록 (요약 정보 포함) 반환.
+
+**GET /sessions/{id}**
+- 특정 세션의 상세 정보 및 매매 내역(Orders) 반환.
+
+### 6.4 Domain Model Extensions
+
+- **BotSession**:
+  - `id`: UUID
+  - `bot_id`: UUID
+  - `start_time`, `end_time`: DateTime
+  - `status`: ACTIVE, ENDED
+  - `summary`: JSON (Total PnL, Trade Count, Win Rate)
+  - `orders`: List[LocalOrder] (세션에 포함된 주문 목록)
 
 ---
 
@@ -184,7 +189,7 @@ Response: `{"ok": true, "realized_pnl": 0.0}`
 }
 ```
 
-**GET /bots/{bot_id}/sessions** (준비 중)
+**GET /bots/{bot_id}/sessions**
 - 봇의 실행 세션(Start~Stop) 이력 조회
-- Response: `[ { "session_id": "...", "start_time": "...", "end_time": "...", "session_pnl": 50.0 } ]`
+- Response: `[ { "session_id": "...", "start_time": "...", "end_time": "...", "summary": {...} } ]`
 
