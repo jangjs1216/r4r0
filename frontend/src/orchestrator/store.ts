@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type ViewId = 'dashboard' | 'market' | 'portfolio' | 'bot-config' | 'bot-editor' | 'bot-trades' | 'auth';
+export type ViewId = 'dashboard' | 'market' | 'portfolio' | 'bot-config' | 'bot-editor' | 'bot-trades' | 'backtest' | 'auth';
 
 interface OrchestratorState {
     currentView: ViewId;

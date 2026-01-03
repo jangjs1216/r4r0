@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { BotService } from './api';
 import type { StrategyDefinition, BotConfig, ExchangeCredential } from './api';
-import { ChevronRight, CheckCircle, AlertCircle, Save, ArrowLeft, Activity, ShieldCheck, Settings2, Wallet } from 'lucide-react';
+import { ChevronRight, CheckCircle, AlertCircle, Save, ArrowLeft, Activity, ShieldCheck, Settings2, Wallet, Play } from 'lucide-react';
 import { useOrchestratorStore } from '../../orchestrator/store';
 
 // --- Components ---
@@ -181,6 +181,13 @@ const BotEditorView: React.FC = () => {
                     </h1>
                 </div>
                 <div className="flex gap-3">
+                    <button
+                        onClick={() => setView('backtest')}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-400 hover:text-blue-300 transition border border-blue-500/30 rounded-lg hover:bg-blue-500/10"
+                    >
+                        <Play size={16} />
+                        Run Backtest
+                    </button>
                     <button className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition">Reset</button>
                     <button
                         onClick={handleSave}

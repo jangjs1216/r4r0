@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, LineChart, Wallet, Settings, ShieldCheck, Activity } from 'lucide-react';
+import { LayoutDashboard, LineChart, Wallet, Settings, ShieldCheck, Activity, FlaskConical } from 'lucide-react';
 import type { ViewId } from './store';
 import { useOrchestratorStore } from './store';
 import { cn } from '../lib/utils';
@@ -11,6 +11,7 @@ const NAV_ITEMS: { id: ViewId; label: string; icon: React.ReactNode }[] = [
     { id: 'portfolio', label: 'Portfolio', icon: <Wallet size={20} /> },
     { id: 'bot-config', label: 'Bot Config', icon: <Settings size={20} /> },
     { id: 'bot-trades', label: 'Bot Trades', icon: <Activity size={20} /> },
+    { id: 'backtest', label: 'Backtest', icon: <FlaskConical size={20} /> },
     { id: 'auth', label: 'Auth', icon: <ShieldCheck size={20} /> },
 ];
 

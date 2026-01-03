@@ -6,6 +6,7 @@ import PortfolioView from './views/portfolio/PortfolioView';
 import BotConfigView from './views/bot-config/BotConfigView';
 import BotEditorView from './views/bot-editor/BotEditorView';
 import BotTradesView from './views/bot-trades/BotTradesView';
+import { BacktestView } from './views/backtest/BacktestView';
 import AuthView from './views/auth/AuthView';
 
 export default function App() {
@@ -19,6 +20,7 @@ export default function App() {
       case 'bot-config': return <BotConfigView />;
       case 'bot-editor': return <BotEditorView />;
       case 'bot-trades': return <BotTradesView />;
+      case 'backtest': return <BacktestView />;
       case 'auth': return <AuthView />;
       default: return <DashboardView />;
     }
