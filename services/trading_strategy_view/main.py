@@ -57,6 +57,41 @@ STRATEGIES = [
             },
             "required": ["allocation_ratio", "hold_duration"]
         }
+    },
+    {
+        "id": "orderflow_exhaustion_v1",
+        "name": "오더플로우 고갈 역추세 (Orderflow Exhaustion Fade)",
+        "description": "탐욕/공포성 시장가 주문(체결 불균형) 이후, 더 못 가는 '흡수/고갈'이 확인되면 반대 방향으로 진입합니다. (현물 기반: SELL은 보유 base 자산 일부 매도 후 되돌림에서 재매수)",
+        "version": "1.0.0",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "depth_limit": {"type": "integer", "minimum": 5, "maximum": 200, "default": 50, "title": "오더북 Depth Limit"},
+                "trades_limit": {"type": "integer", "minimum": 20, "maximum": 1000, "default": 200, "title": "최근 체결 조회 개수"},
+                "trades_lookback_sec": {"type": "integer", "minimum": 3, "maximum": 60, "default": 10, "title": "체결 집계 구간(초)"},
+
+                "delta_ratio_threshold": {"type": "number", "minimum": 1.2, "maximum": 10.0, "default": 2.5, "title": "체결 불균형 비율 임계값"},
+                "min_total_quote_volume": {"type": "number", "minimum": 0, "default": 50.0, "title": "최소 체결대금(Quote)"},
+
+                "spread_expand_ratio_threshold": {"type": "number", "minimum": 1.0, "maximum": 10.0, "default": 1.5, "title": "스프레드 확장 비율 임계값"},
+                "sweep_move_pct_threshold": {"type": "number", "minimum": 0.0, "maximum": 0.05, "default": 0.001, "title": "미드 가격 급변(%) 임계값"},
+                "confirm_absorption_ticks": {"type": "integer", "minimum": 1, "maximum": 10, "default": 2, "title": "흡수 확인 틱 수"},
+
+                "buy_allocation_ratio": {"type": "number", "minimum": 0.01, "maximum": 1.0, "default": 0.1, "title": "BUY 할당 비율(Quote 기준)"},
+                "sell_allocation_ratio": {"type": "number", "minimum": 0.01, "maximum": 1.0, "default": 0.1, "title": "SELL 할당 비율(Base 기준)"},
+                "quantity_precision": {"type": "integer", "minimum": 0, "maximum": 12, "default": 5, "title": "수량 반올림 자릿수"},
+
+                "take_profit_pct": {"type": "number", "minimum": 0.0, "maximum": 0.1, "default": 0.003, "title": "익절(%)"},
+                "stop_loss_pct": {"type": "number", "minimum": 0.0, "maximum": 0.1, "default": 0.004, "title": "손절(%)"},
+                "stop_buffer_pct": {"type": "number", "minimum": 0.0, "maximum": 0.05, "default": 0.001, "title": "스윕 고/저점 버퍼(%)"},
+                "time_stop_sec": {"type": "integer", "minimum": 10, "maximum": 3600, "default": 180, "title": "시간 청산(초)"},
+                "cooldown_sec": {"type": "integer", "minimum": 0, "maximum": 3600, "default": 120, "title": "쿨다운(초)"},
+
+                "spread_ema_alpha": {"type": "number", "minimum": 0.01, "maximum": 1.0, "default": 0.2, "title": "스프레드 EMA 알파"},
+                "spread_normalized_max_ratio": {"type": "number", "minimum": 1.0, "maximum": 5.0, "default": 1.2, "title": "스프레드 정상화 최대비율"}
+            },
+            "required": []
+        }
     }
 ]
 

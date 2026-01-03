@@ -3,11 +3,11 @@ info:
   title: Exchange Adapter API
   version: 1.0.0
 paths:
-  /balance/{keyId}:
+  /balance/{key_id}:
     get:
       summary: Get account balance for a specific key
       parameters:
-        - name: keyId
+        - name: key_id
           in: path
           required: true
           schema:
@@ -22,6 +22,101 @@ paths:
                 $ref: '#/components/schemas/AccountBalance'
         '400':
           description: Invalid key or exchange error
+
+  /market/ticker:
+    get:
+      summary: Get current price and basic limits for a symbol
+      parameters:
+        - name: key_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: symbol
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful ticker retrieval
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticker'
+
+  /market/depth:
+    get:
+      summary: Get orderbook depth
+      parameters:
+        - name: key_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: symbol
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Successful depth retrieval
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Depth'
+
+  /market/trades:
+    get:
+      summary: Get recent trades
+      parameters:
+        - name: key_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: symbol
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Successful trades retrieval
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TradesResponse'
+
+  /order:
+    post:
+      summary: Place an order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderRequest'
+      responses:
+        '200':
+          description: Order accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
 
 components:
   schemas:
@@ -48,3 +143,109 @@ components:
           type: number
         usdtValue:
           type: number
+
+    Ticker:
+      type: object
+      properties:
+        symbol:
+          type: string
+        price:
+          type: number
+        limits:
+          type: object
+          properties:
+            min_notional:
+              type: number
+              nullable: true
+            min_amount:
+              type: number
+              nullable: true
+
+    Depth:
+      type: object
+      properties:
+        symbol:
+          type: string
+        timestamp:
+          type: integer
+          nullable: true
+        best_bid:
+          type: number
+          nullable: true
+        best_ask:
+          type: number
+          nullable: true
+        bids:
+          type: array
+          items:
+            type: array
+            minItems: 2
+            maxItems: 2
+            items:
+              type: number
+        asks:
+          type: array
+          items:
+            type: array
+            minItems: 2
+            maxItems: 2
+            items:
+              type: number
+
+    Trade:
+      type: object
+      properties:
+        timestamp:
+          type: integer
+          nullable: true
+        price:
+          type: number
+          nullable: true
+        amount:
+          type: number
+          nullable: true
+        side:
+          type: string
+          nullable: true
+          description: buy/sell when available from exchange
+
+    TradesResponse:
+      type: object
+      properties:
+        symbol:
+          type: string
+        trades:
+          type: array
+          items:
+            $ref: '#/components/schemas/Trade'
+
+    OrderRequest:
+      type: object
+      required: [key_id, symbol, side, amount]
+      properties:
+        key_id:
+          type: string
+        symbol:
+          type: string
+        side:
+          type: string
+          enum: [buy, sell]
+        amount:
+          type: number
+        order_type:
+          type: string
+          default: market
+        price:
+          type: number
+          nullable: true
+
+    OrderResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        order_id:
+          type: string
+          nullable: true
+        details:
+          type: object
