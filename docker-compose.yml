@@ -79,6 +79,16 @@ services:
     networks:
       - r4r0-net
 
+  # BacktestService (Historical Simulation)
+  backtest-service:
+    build:
+      context: ./services/backtest_service
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8000"
+    networks:
+      - r4r0-net
+
 networks:
   r4r0-net:
     driver: bridge

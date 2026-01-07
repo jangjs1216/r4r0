@@ -5,15 +5,16 @@ import { BacktestResultDashboard } from './BacktestResultDashboard';
 import { ArrowLeftIcon } from '@heroicons/react/24/solid';
 import { useOrchestratorStore } from '../../orchestrator/store';
 import { FlaskConical } from 'lucide-react';
+import type { BacktestResponse } from './api';
 
 export const BacktestView: React.FC = () => {
     const [isRunning, setIsRunning] = useState(false);
+    const [result, setResult] = useState<any>(mockBacktestResult); // Initialize with mock or null
     const { setView } = useOrchestratorStore();
 
-    // Simulate Run
-    const handleRun = () => {
-        setIsRunning(true);
-        setTimeout(() => setIsRunning(false), 1500); // More realistic delay
+    const handleRunComplete = (data: BacktestResponse) => {
+        // Data is already in correct format (snake_case) matching types.ts
+        setResult(data);
     };
 
     return (
@@ -60,7 +61,11 @@ export const BacktestView: React.FC = () => {
                     <div className="p-6 space-y-8">
                         <div>
                             <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Configuration</h3>
-                            <BacktestConfigForm onRun={handleRun} isRunning={isRunning} />
+                            <BacktestConfigForm
+                                onRun={handleRunComplete}
+                                isRunning={isRunning}
+                                setIsRunning={setIsRunning}
+                            />
                         </div>
 
                         {/* History Section */}
@@ -86,7 +91,7 @@ export const BacktestView: React.FC = () => {
                 {/* Right Result Panel */}
                 <div className="flex-grow p-8 overflow-y-auto bg-gradient-to-b from-gray-950 to-black z-0">
                     <div className="max-w-7xl mx-auto">
-                        <BacktestResultDashboard result={mockBacktestResult} />
+                        <BacktestResultDashboard result={result} />
                     </div>
                 </div>
             </div>
